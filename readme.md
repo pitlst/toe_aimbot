@@ -26,12 +26,12 @@ sudo apt update && sudo apt install -y git cmake g++ wget unzip curl libboost-al
 
 可选的，添加ffmpeg以方便录视频和后续操作
 ```
-& sudo apt install -y ffmpeg
+sudo apt install -y ffmpeg
 ```
 
 可选的，安装网络库方便查看ip
 ```
-& sudo apt install -y net-tools
+sudo apt install -y net-tools
 ```
 ### 编译opencv实现tbb加速
 
