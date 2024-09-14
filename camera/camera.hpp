@@ -1,5 +1,5 @@
-#ifndef CAMERA_H_
-#define CAMERA_H_
+#ifndef TOE_CAMERA_H_
+#define TOE_CAMERA_H_
 
 #include <mutex>
 

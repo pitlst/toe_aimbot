@@ -2,7 +2,7 @@
 #define TOE_STRUCTS_H_
 
 #include <string>
-#include <opencv2/opencv.hpp>
+#include "opencv2/opencv.hpp"
 
 // 数据转换用联合体
 union acm_data{

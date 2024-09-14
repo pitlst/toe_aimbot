@@ -40,9 +40,9 @@ set(OpenVINO_DIR /home/cheakf/openvino/build/)
 find_package(OpenVINO REQUIRED)
 
 # 设置头文件查找路径
-include_directories(${OpenVINO_DIR}/../include)
-include_directories(${OpenVINO_DIR}/../include/ie)
 include_directories(
+    ${OpenVINO_DIR}/../include
+    ${OpenVINO_DIR}/../include/ie
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}
@@ -52,16 +52,18 @@ include_directories(
     determine
     detect
 )
-# 把项目目录定义成宏传递给程序
-add_compile_definitions(PROJECT_PATH=\"${PROJECT_SOURCE_DIR}/\")
 
 #--------------------------------------------------------------------------------------#
 #   项目编译设置
 #--------------------------------------------------------------------------------------#
+# 把项目目录定义成宏传递给程序
+add_compile_definitions(PROJECT_PATH=\"${PROJECT_SOURCE_DIR}/\")
 add_executable(${PROJECT_NAME} 
                 ${HIK_INCLUDE}
                 camera/camera.hpp
-                debug.hpp
+                general/nlohmann/json.hpp
+                general/structs.hpp
+                general/debug.hpp
                 main.cpp 
                 )
-target_link_libraries(${PROJECT_NAME} PRIVATE pthread ${OpenCV_LIBS} ${HIK_LIBS} ${Boost_LIBRARIES} ${TENSORRT_LIBRARY} ${CUDA_LIBRARIES} openvino::runtime)
+target_link_libraries(${PROJECT_NAME} PRIVATE pthread ${OpenCV_LIBS} ${HIK_LIBS} ${Boost_LIBRARIES} openvino::runtime)
