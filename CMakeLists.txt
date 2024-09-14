@@ -38,10 +38,10 @@ find_package(OpenCV REQUIRED)
 # 找到openvino
 set(OpenVINO_DIR /home/cheakf/openvino/build/)
 find_package(OpenVINO REQUIRED)
-message(STATUS "已找到openvino,路径" ${OpenVINO_DIR}/../include)
+
+# 设置头文件查找路径
 include_directories(${OpenVINO_DIR}/../include)
 include_directories(${OpenVINO_DIR}/../include/ie)
-# 设置头文件查找路径
 include_directories(
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
@@ -51,8 +51,6 @@ include_directories(
     serial
     determine
     detect
-    detect/intel_nuc_11
-    detect/nvidia_orin_nx
 )
 # 把项目目录定义成宏传递给程序
 add_compile_definitions(PROJECT_PATH=\"${PROJECT_SOURCE_DIR}/\")
@@ -62,22 +60,8 @@ add_compile_definitions(PROJECT_PATH=\"${PROJECT_SOURCE_DIR}/\")
 #--------------------------------------------------------------------------------------#
 add_executable(${PROJECT_NAME} 
                 ${HIK_INCLUDE}
+                camera/camera.hpp
                 debug.hpp
-                # general/toe_json.hpp
-                # general/toe_structs.hpp
-                # general/general.hpp
-                # camera/grab_img.hpp
-                # camera/grab_img.cpp
-                # serial/toe_serial.hpp
-                # serial/toe_serial.cpp 
-                # determine/determine.hpp
-                # determine/determine.cpp
-                # detect/detect.hpp
-                # detect/detect.cpp
-                # detect/intel_nuc_11/ov_detect.hpp
-                # detect/intel_nuc_11/ov_detect.cpp
-                # detect/nvidia_orin_nx/orin_detect.hpp
-                # detect/nvidia_orin_nx/orin_detect.hpp
                 main.cpp 
                 )
 target_link_libraries(${PROJECT_NAME} PRIVATE pthread ${OpenCV_LIBS} ${HIK_LIBS} ${Boost_LIBRARIES} ${TENSORRT_LIBRARY} ${CUDA_LIBRARIES} openvino::runtime)

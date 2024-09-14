@@ -1,0 +1,93 @@
+{
+    "path": {
+        "engine_file_path": "data/weights/yolo.engine",
+        "bin_file_path": "data/weights/2.bin",
+        "xml_file_path": "data/weights/2.xml",
+        "serial_path": "/dev/ttyACM0"
+    },
+    "determine": {
+        "max_history_armor_len": 10,
+        "max_loss_armor_fps": 10
+    },
+    "camera": {
+        "0": {
+            "width": 864,
+            "height": 864,
+            "offset_x": 0,
+            "offset_y": 0,
+            "Reverse_X": false,
+            "Reverse_Y": false,
+            "ADC_bit_depth": 8,
+            "exposure": 5000,
+            "gain": 10,
+            "balck_level": 240
+        },
+        "1": {
+            "width": 1440,
+            "height": 1080,
+            "offset_x": 0,
+            "offset_y": 0,
+            "Reverse_X": false,
+            "Reverse_Y": false,
+            "ADC_bit_depth": 8,
+            "exposure": 5000,
+            "gain": 10,
+            "balck_level": 240
+        }
+    },
+    "NCHW": {
+        "openvino": {
+            "batch_size": 1,
+            "C": 3,
+            "W": 640,
+            "H": 640
+        },
+        "orin_nx":
+        {
+            "batch_size": 1,
+            "C": 3,
+            "W": 640,
+            "H": 640
+        }
+    },
+    "thresh": {
+        "nms_thresh": 0.7,
+        "bbox_conf_thresh": 0.6,
+        "merge_thresh": 0.8,
+        "max_wellid_distance": 8
+    },
+    "nums": {
+        "classes": 8,
+        "sizes": 2,
+        "colors": 4,
+        "kpts": 8
+    },
+    "z_scale": 67116,
+    "anchors": {
+        "1": [],
+        "2": [
+            4,
+            5,
+            8,
+            10,
+            13,
+            16
+        ],
+        "3": [
+            23,
+            29,
+            43,
+            55,
+            73,
+            105
+        ],
+        "4": [
+            146,
+            217,
+            231,
+            300,
+            335,
+            433
+        ]
+    }
+}
