@@ -94,8 +94,75 @@ make -j8
 
 ## 二次开发
 
-### 项目结构
+### 相机接口
 
+相机类的所属文件为camera/camera.hpp
 
+虽然没有限制，但仍然建议一口气将所有的相机均初始化完成后开始取流，同时留好了多线程的锁，支持线程安全
 
+对于多个相机，应当在
+
+一个类对应一个相机，并在初始化时指定index也就是第几台相机
+
+这里是一个简单的使用demo
+```
+#include <iostream>
+#include <fstream>
+
+#include "camera.hpp"
+#include "nlohmann/json.hpp"
+
+int main()
+{
+    toe::hik_camera temp;
+    std::ifstream f("../config.json");
+    nlohmann::json temp_apra = nlohmann::json::parse(f);
+    temp.hik_init(temp_apra,0);
+    int k = 0;
+    cv::Mat img;
+    while (k != 27)
+    {
+        frame_mutex.lock();
+        img = frame_rgb;
+        frame_mutex.unlock();
+        if (img.data)
+        {
+            cv::imshow("frame",img);
+        }
+        k = cv::waitKey(1);
+    }
+    temp.hik_end();
+    return 0;
+}
+```
+对于程序中提到的配置文件，其结构如下
+```
+    "camera": {
+        "0": {
+            "width": 864,
+            "height": 864,
+            "offset_x": 0,
+            "offset_y": 0,
+            "Reverse_X": false,
+            "Reverse_Y": false,
+            "ADC_bit_depth": 8,
+            "exposure": 5000,
+            "gain": 10,
+            "balck_level": 240
+        },
+        "1": {
+            "width": 1440,
+            "height": 1080,
+            "offset_x": 0,
+            "offset_y": 0,
+            "Reverse_X": false,
+            "Reverse_Y": false,
+            "ADC_bit_depth": 8,
+            "exposure": 5000,
+            "gain": 10,
+            "balck_level": 240
+        }
+    }
+```
+这里不限制相机的个数，
 正在编写ing

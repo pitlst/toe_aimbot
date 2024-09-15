@@ -9,14 +9,15 @@ int main()
     toe::hik_camera temp;
     std::ifstream f("../config.json");
     nlohmann::json temp_apra = nlohmann::json::parse(f);
-    temp.hik_init(temp_apra,0);
+    int device_num = 0;
+    temp.hik_init(temp_apra, device_num);
     int k = 0;
     cv::Mat img;
     while (k != 27)
     {
-        frame_mutex.lock();
-        img = frame_rgb;
-        frame_mutex.unlock();
+        mutex_array[device_num].lock();
+        img = frame_array[device_num];
+        mutex_array[device_num].unlock();
         if (img.data)
         {
             cv::imshow("frame",img);

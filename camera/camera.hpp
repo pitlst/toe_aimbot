@@ -2,6 +2,7 @@
 #define TOE_CAMERA_H_
 
 #include <mutex>
+#include <array>
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core.hpp"
@@ -23,6 +24,7 @@ namespace toe
         
     private:
         camera_data params_;
+        std::mutex frame_mutex;
         cv::Mat frame;
 
         // 海康相机指针
@@ -30,8 +32,15 @@ namespace toe
     };
 }
 
-extern void __stdcall image_callback_EX(unsigned char *pData, MV_FRAME_OUT_INFO_EX* stImageInfo, void* pUser);
-extern cv::Mat frame_rgb;
-extern std::mutex frame_mutex;
+// 暂时仅做了同时7个海康相机的支持
+extern void __stdcall image_callback_0(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern void __stdcall image_callback_1(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern void __stdcall image_callback_2(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern void __stdcall image_callback_3(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern void __stdcall image_callback_4(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern void __stdcall image_callback_5(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern void __stdcall image_callback_6(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
+extern std::array<cv::Mat, 7> frame_array;
+extern std::array<std::mutex, 7> mutex_array;
 
 #endif

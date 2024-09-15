@@ -1,17 +1,23 @@
 #include "camera.hpp"
 
 #include <string>
-#include <stdio.h>
-#include <unistd.h>
+#include <sstream>
+#include <stdexcept>
+
 #include <stdlib.h>
 
 using namespace toe;
 
-cv::Mat frame_rgb;
-std::mutex frame_mutex;
+std::array<cv::Mat, 7> frame_array;
+std::array<std::mutex, 7> mutex_array;
 
 bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
 {
+    // 检查devive_num是否超出要求
+    if (devive_num > 6)
+    {
+        throw std::logic_error("devive_num的大小超出要求，暂时仅支持7个设备，devive_num不能大于6");
+    }
     // 根据json解析参数
     auto temp_para = input_json["camera"][std::to_string(devive_num)];
     params_.device_id = devive_num;
@@ -35,8 +41,9 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     int nRet = MV_CC_EnumDevices(MV_USB_DEVICE, &stDeviceList);
     if (MV_OK != nRet)
     {
-        printf("MV_CC_EnumDevices fail! nRet [%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "V_CC_EnumDevices fail! nRet " << nRet;
+        throw std::logic_error(s.str());
     }
     if (stDeviceList.nDeviceNum > 0)
     {
@@ -45,14 +52,15 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
             MV_CC_DEVICE_INFO* pDeviceInfo = stDeviceList.pDeviceInfo[i];
             if (NULL == pDeviceInfo)
             {
-                exit(1);
+                std::stringstream s;
+                s << "找到的设备报错，对应设备号为 " << i;
+                throw std::logic_error(s.str());
             }         
         }  
     } 
     else
     {
-        printf("Find No Devices!\n");
-        exit(1);
+        throw std::logic_error("Find No Devices!");
     }
 
     unsigned int nIndex = params_.device_id;
@@ -61,24 +69,27 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     nRet = MV_CC_CreateHandle(&handle, stDeviceList.pDeviceInfo[nIndex]);
     if (MV_OK != nRet)
     {
-        printf("MV_CC_CreateHandle fail! nRet [%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "MV_CC_CreateHandle fail! nRet " << nRet;
+        throw std::logic_error(s.str());
     }
     // 打开设备
     // open device
     nRet = MV_CC_OpenDevice(handle);
     if (MV_OK != nRet)
     {
-        printf("MV_CC_OpenDevice fail! nRet [%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "MV_CC_OpenDevice fail! nRet " << nRet;
+        throw std::logic_error(s.str());
     }
     // 设置触发模式为off
     // set trigger mode as off
     nRet = MV_CC_SetEnumValue(handle, "TriggerMode", 0);
     if (MV_OK != nRet)
     {
-        printf("MV_CC_SetTriggerMode fail! nRet [%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "MV_CC_SetTriggerMode fail! nRet " << nRet;
+        throw std::logic_error(s.str());
     }
 
     // ch：设置曝光时间，图像的长宽,和所取图像的偏移
@@ -86,44 +97,52 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     nRet = MV_CC_SetIntValue(handle, "OffsetX", 0);
     if (MV_OK != nRet)
     {
-        printf("设置OffsetX错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置OffsetX错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     nRet = MV_CC_SetIntValue(handle, "OffsetY", 0);
     if (MV_OK != nRet)
     {
-        printf("设置OffsetX错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置OffsetY错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     nRet = MV_CC_SetFloatValue(handle, "ExposureTime", params_.exposure);
     if (MV_OK != nRet)
     {
-        printf("设置曝光错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置曝光错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     nRet = MV_CC_SetIntValue(handle, "Width", params_.width);
     if (MV_OK != nRet)
     {
-        printf("设置Width错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置Width错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     nRet = MV_CC_SetIntValue(handle, "Height", params_.height);
     if (MV_OK != nRet)
     {
-        printf("设置Height错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置Height错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
+    // 这里设置相机偏移两遍是因为有的时候上次窗长宽与偏移相冲突
     nRet = MV_CC_SetIntValue(handle, "OffsetX", params_.offset_x);
     if (MV_OK != nRet)
     {
-        printf("设置Height错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置OffsetX错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     nRet = MV_CC_SetIntValue(handle, "OffsetY", params_.offset_y);
     if (MV_OK != nRet)
     {
-        printf("设置Height错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置OffsetY错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
 
     // RGB格式0x02180014
@@ -131,30 +150,62 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     nRet = MV_CC_SetEnumValue(handle, "PixelFormat", 0x01080009);
     if (MV_OK != nRet)
     {
-        printf("设置传输图像格式错误,错误码:[%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "设置传输图像格式错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     nRet = MV_CC_SetFloatValue(handle, "Gain", params_.gain);
     if (MV_OK != nRet)
     {
-        printf("设置增益错误,错误码:[%x]\n", nRet);
-        exit(1);;
+        std::stringstream s;
+        s << "设置增益错误,错误码:" << nRet;
+        throw std::logic_error(s.str());
     }
     // 注册抓图回调
     // register image callback
-    nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_EX, handle);
+    switch (devive_num)
+    {
+    case 0:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_0, handle);
+        break;
+    case 1:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_1, handle);
+        break;
+    case 2:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_2, handle);
+        break;
+    case 3:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_3, handle);
+        break;
+    case 4:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_4, handle);
+        break;
+    case 5:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_5, handle);
+        break;
+    case 6:
+        nRet = MV_CC_RegisterImageCallBackEx(handle, image_callback_6, handle);
+        break;
+    default:
+        std::stringstream s;
+        s << "意外的设备号:" << devive_num;
+        throw std::logic_error(s.str());
+    }
+    
     if (MV_OK != nRet)
     {
-        printf("MV_CC_RegisterImageCallBackEx fail! nRet [%x]\n", nRet);
-        exit(1); 
+        std::stringstream s;
+        s << "MV_CC_RegisterImageCallBackEx fail! nRet " << nRet;
+        throw std::logic_error(s.str());
     }
     // 开始取流
     // start grab image
     nRet = MV_CC_StartGrabbing(handle);
     if (MV_OK != nRet)
     {
-        printf("MV_CC_StartGrabbing fail! nRet [%x]\n", nRet);
-        exit(1);
+        std::stringstream s;
+        s << "MV_CC_StartGrabbing fail! nRet " << nRet;
+        throw std::logic_error(s.str());
     }
     std::cout << "hik init" << std::endl;
     return true;
@@ -200,13 +251,79 @@ bool hik_camera::hik_end()
     return true;
 }
 
-void __stdcall image_callback_EX(unsigned char * pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_0(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
 {
     if (pFrameInfo)
     {
         cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
-        frame_mutex.lock();
-        cv::cvtColor(img_bayerrg_, frame_rgb, cv::COLOR_BayerRG2RGB);
-        frame_mutex.unlock();
+        mutex_array[0].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[0], cv::COLOR_BayerRG2RGB);
+        mutex_array[0].unlock();
+    }
+}
+
+void __stdcall image_callback_1(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+{
+    if (pFrameInfo)
+    {
+        cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
+        mutex_array[1].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[1], cv::COLOR_BayerRG2RGB);
+        mutex_array[1].unlock();
+    }
+}
+
+void __stdcall image_callback_2(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+{
+    if (pFrameInfo)
+    {
+        cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
+        mutex_array[2].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[2], cv::COLOR_BayerRG2RGB);
+        mutex_array[2].unlock();
+    }
+}
+
+void __stdcall image_callback_3(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+{
+    if (pFrameInfo)
+    {
+        cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
+        mutex_array[3].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[3], cv::COLOR_BayerRG2RGB);
+        mutex_array[3].unlock();
+    }
+}
+
+void __stdcall image_callback_4(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+{
+    if (pFrameInfo)
+    {
+        cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
+        mutex_array[4].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[4], cv::COLOR_BayerRG2RGB);
+        mutex_array[4].unlock();
+    }
+}
+
+void __stdcall image_callback_5(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+{
+    if (pFrameInfo)
+    {
+        cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
+        mutex_array[5].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[5], cv::COLOR_BayerRG2RGB);
+        mutex_array[5].unlock();
+    }
+}
+
+void __stdcall image_callback_6(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+{
+    if (pFrameInfo)
+    {
+        cv::Mat img_bayerrg_ = cv::Mat(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1, pData);
+        mutex_array[6].lock();
+        cv::cvtColor(img_bayerrg_, frame_array[6], cv::COLOR_BayerRG2RGB);
+        mutex_array[6].unlock();
     }
 }
