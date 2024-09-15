@@ -62,6 +62,8 @@ add_executable(${PROJECT_NAME}
                 ${HIK_INCLUDE}
                 camera/camera.hpp
                 camera/camera.cpp
+                serial/serial.hpp
+                serial/serial.cpp
                 general/nlohmann/json.hpp
                 general/structs.hpp
                 general/debug.hpp

@@ -13,8 +13,7 @@ std::mutex frame_mutex;
 bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
 {
     // 根据json解析参数
-    nlohmann::json temp_para = input_json;
-    temp_para = temp_para["camera"][std::to_string(devive_num)];
+    auto temp_para = input_json["camera"][std::to_string(devive_num)];
     params_.device_id = devive_num;
     params_.width = temp_para["width"].get<int>();
     params_.height = temp_para["height"].get<int>();
