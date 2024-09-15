@@ -102,7 +102,11 @@ make -j8
 
 对于多个相机，应当在
 
-一个类对应一个相机，并在初始化时指定index也就是第几台相机
+一个类对应一个相机，并在初始化时指定index也就是第几台相机，最多支持7个相机，其实这部分可以使用宏重写以达到支持到海康sdk的极限即256个相机，但是没必要且没有可读性，我就手动宏展开了
+
+实际上在hik_init函数执行完成后，全局变量frame_array里就会实时更新最新的相机帧
+
+如果你不加锁并且多线程去读相机，会出现图像上半部分上一帧，下半部分下一帧的情况，此时不会报错
 
 这里是一个简单的使用demo
 ```
@@ -117,14 +121,15 @@ int main()
     toe::hik_camera temp;
     std::ifstream f("../config.json");
     nlohmann::json temp_apra = nlohmann::json::parse(f);
-    temp.hik_init(temp_apra,0);
+    int device_num = 0;
+    temp.hik_init(temp_apra, device_num);
     int k = 0;
     cv::Mat img;
     while (k != 27)
     {
-        frame_mutex.lock();
-        img = frame_rgb;
-        frame_mutex.unlock();
+        mutex_array[device_num].lock();
+        img = frame_array[device_num];
+        mutex_array[device_num].unlock();
         if (img.data)
         {
             cv::imshow("frame",img);
@@ -145,7 +150,6 @@ int main()
             "offset_y": 0,
             "Reverse_X": false,
             "Reverse_Y": false,
-            "ADC_bit_depth": 8,
             "exposure": 5000,
             "gain": 10,
             "balck_level": 240
@@ -157,12 +161,14 @@ int main()
             "offset_y": 0,
             "Reverse_X": false,
             "Reverse_Y": false,
-            "ADC_bit_depth": 8,
             "exposure": 5000,
             "gain": 10,
             "balck_level": 240
         }
     }
 ```
-这里不限制相机的个数，
+具体含义就是长宽像素，横方向和纵方向的偏移，是否在xy方向翻转，曝光，增益，黑电平
+这些参数的实际效果与含义在海康sdk的文档上写的很清楚，我就不展开了，常用的就这些，有需要提issue我再加
+
+
 正在编写ing

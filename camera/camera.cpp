@@ -25,7 +25,6 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     params_.height = temp_para["height"].get<int>();
     params_.offset_x = temp_para["offset_x"].get<int>();
     params_.offset_y = temp_para["offset_y"].get<int>();
-    params_.ADC_bit_depth = temp_para["ADC_bit_depth"].get<int>();
     params_.exposure = temp_para["exposure"].get<int>();
     params_.gain = temp_para["gain"].get<int>();
     params_.balck_level = temp_para["balck_level"].get<int>();
