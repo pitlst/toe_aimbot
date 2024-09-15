@@ -61,6 +61,7 @@ add_compile_definitions(PROJECT_PATH=\"${PROJECT_SOURCE_DIR}/\")
 add_executable(${PROJECT_NAME} 
                 ${HIK_INCLUDE}
                 camera/camera.hpp
+                camera/camera.cpp
                 general/nlohmann/json.hpp
                 general/structs.hpp
                 general/debug.hpp

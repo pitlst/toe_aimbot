@@ -18,7 +18,7 @@ namespace toe
         hik_camera() = default;
         ~hik_camera() = default;
 
-        bool hik_init(const json & input_json, int devive_num);
+        bool hik_init(const nlohmann::json & input_json, int devive_num);
         bool hik_end();
         
     private:
