@@ -1,3 +1,5 @@
+#使用 cmake_policy 命令来设置政策 CMP0167
+cmake_policy(SET CMP0167 NEW)
 #--------------------------------------------------------------------------------------#
 #   项目总体设置
 #--------------------------------------------------------------------------------------#
@@ -31,12 +33,14 @@ FILE (GLOB HIK_LIBS "/opt/MVS/lib/64/*.so")
 FILE (GLOB HIK_INCLUDE "/opt/MVS/include/*.h")
 include_directories(/opt/MVS/include)
 # 找到boost
-find_package(Boost REQUIRED)
+#这个问题好像不影响但是还是加上，提醒一下
+#find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system filesystem)
 # 找到opencv
-set(OpenCV_DIR /home/cheakf/opencv-4.8.0/build/)
+set(OpenCV_DIR /home/toe-volleyball/opencv-4.8.0/build/)
 find_package(OpenCV REQUIRED)
 # 找到openvino
-set(OpenVINO_DIR /home/cheakf/openvino/build/)
+set(OpenVINO_DIR /home/toe-volleyball/openvino/build/)
 find_package(OpenVINO REQUIRED)
 
 # 设置头文件查找路径
@@ -51,6 +55,8 @@ include_directories(
     serial
     determine
     detect
+    usbcamera
+    
 )
 
 #--------------------------------------------------------------------------------------#
@@ -62,6 +68,8 @@ add_executable(${PROJECT_NAME}
                 ${HIK_INCLUDE}
                 camera/camera.hpp
                 camera/camera.cpp
+                usbcamera/usbcamera.hpp
+                usbcamera/usbcamera.cpp
                 serial/serial.hpp
                 serial/serial.cpp
                 general/nlohmann/json.hpp
@@ -69,4 +77,5 @@ add_executable(${PROJECT_NAME}
                 general/debug.hpp
                 main.cpp 
                 )
+
 target_link_libraries(${PROJECT_NAME} PRIVATE pthread ${OpenCV_LIBS} ${HIK_LIBS} ${Boost_LIBRARIES} openvino::runtime)

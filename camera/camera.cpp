@@ -1,5 +1,4 @@
 #include "camera.hpp"
-
 #include <string>
 #include <sstream>
 #include <stdexcept>
@@ -11,7 +10,8 @@ using namespace toe;
 std::array<cv::Mat, 7> frame_array;
 std::array<std::mutex, 7> mutex_array;
 
-bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
+
+bool hik_camera::hik_init(const nlohmann::json &input_json, int devive_num)
 {
     // 检查devive_num是否超出要求
     if (devive_num > 6)
@@ -48,15 +48,15 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     {
         for (int i = 0; i < stDeviceList.nDeviceNum; i++)
         {
-            MV_CC_DEVICE_INFO* pDeviceInfo = stDeviceList.pDeviceInfo[i];
+            MV_CC_DEVICE_INFO *pDeviceInfo = stDeviceList.pDeviceInfo[i];
             if (NULL == pDeviceInfo)
             {
                 std::stringstream s;
                 s << "找到的设备报错，对应设备号为 " << i;
                 throw std::logic_error(s.str());
-            }         
-        }  
-    } 
+            }
+        }
+    }
     else
     {
         throw std::logic_error("Find No Devices!");
@@ -92,7 +92,7 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
     }
 
     // ch：设置曝光时间，图像的长宽,和所取图像的偏移
-    //注意，这里对offset的值应当提前归零，防止出现长度溢出问题
+    // 注意，这里对offset的值应当提前归零，防止出现长度溢出问题
     nRet = MV_CC_SetIntValue(handle, "OffsetX", 0);
     if (MV_OK != nRet)
     {
@@ -190,7 +190,7 @@ bool hik_camera::hik_init(const nlohmann::json & input_json, int devive_num)
         s << "意外的设备号:" << devive_num;
         throw std::logic_error(s.str());
     }
-    
+
     if (MV_OK != nRet)
     {
         std::stringstream s;
@@ -250,7 +250,7 @@ bool hik_camera::hik_end()
     return true;
 }
 
-void __stdcall image_callback_0(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_0(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -261,7 +261,7 @@ void __stdcall image_callback_0(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
     }
 }
 
-void __stdcall image_callback_1(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_1(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -272,7 +272,7 @@ void __stdcall image_callback_1(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
     }
 }
 
-void __stdcall image_callback_2(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_2(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -283,7 +283,7 @@ void __stdcall image_callback_2(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
     }
 }
 
-void __stdcall image_callback_3(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_3(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -294,7 +294,7 @@ void __stdcall image_callback_3(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
     }
 }
 
-void __stdcall image_callback_4(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_4(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -305,7 +305,7 @@ void __stdcall image_callback_4(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
     }
 }
 
-void __stdcall image_callback_5(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_5(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -316,7 +316,7 @@ void __stdcall image_callback_5(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
     }
 }
 
-void __stdcall image_callback_6(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser)
+void __stdcall image_callback_6(unsigned char *pData, MV_FRAME_OUT_INFO_EX *pFrameInfo, void *pUser)
 {
     if (pFrameInfo)
     {
@@ -326,3 +326,5 @@ void __stdcall image_callback_6(unsigned char *pData, MV_FRAME_OUT_INFO_EX* pFra
         mutex_array[6].unlock();
     }
 }
+
+

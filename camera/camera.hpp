@@ -13,6 +13,8 @@
 
 namespace toe
 {
+    
+    //#define DEBUE 1
     class hik_camera final
     {
     public:
@@ -30,6 +32,7 @@ namespace toe
         // 海康相机指针
         void *handle = nullptr;
     };
+
 }
 
 // 暂时仅做了同时7个海康相机的支持
