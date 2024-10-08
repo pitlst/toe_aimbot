@@ -1,3 +1,32 @@
+
+/*
+
+               _____                       _____                       ____
+              /\    \                     /\    \                     /\    \
+             /::\    \                   /::\    \                   /::\    \
+             \:::\    \                 /::::\    \                 /::::\    \
+              \:::\    \               /::::::\    \               /::::::\    \
+               \:::\    \             /:::/\:::\    \             /:::/\:::\    \
+                \:::\    \           /:::/  \:::\    \           /:::/__\:::\    \
+                /::::\    \         /:::/    \:::\    \         /::::\   \:::\    \
+               /::::::\    \       /:::/      \:::\    \       /::::::\   \:::\    \
+              /:::/\:::\    \     /:::/        \:::\    \     /:::/\:::\   \:::\    \
+             /:::/  \:::\____\   /:::/          \:::\____\   /:::/__\:::\   \:::\____\
+            /:::/   /\::/    /   \:::\          /:::/    /   \:::\   \:::\   \::/    /
+           /:::/   /  \/____/     \:::\        /:::/    /     \:::\   \:::\   \/____/
+          /:::/   /                \:::\      /:::/    /       \:::\   \:::\    \
+         /:::/   /                  \:::\    /:::/    /         \:::\   \:::\____\
+        /:::/   /                    \:::\  /:::/    /           \:::\   \::/    /
+       /:::/   /                      \:::\/:::/    /             \:::\   \/____/
+      /:::/   /                        \::::::/    /               \:::\    \
+     /:::/   /                          \::::/    /                 \:::\____\
+     \::/   /                            \::/    /                   \::/    /
+      \/___/                              \/____/                     \/____/
+
+TOE实验室
+@作者：
+*/
+
 #include <iostream>
 #include <string>
 #include <thread>
@@ -25,6 +54,8 @@ toe::hik_camera hik_cam; // 创建海康相机的对象
 
 toe::usb_camera usb_cam; // 创建usb相机的对象
 
+toe::serial serial; // 创建串口的对象
+
 nlohmann::json config;
 
 cv::Mat usb_cam_frame; // 用于保存usb相机的图像
@@ -33,6 +64,9 @@ cv::Mat usb_cam_frame; // 用于保存usb相机的图像
 // 串口信息锁
 std::mutex serial_nutex;
 // 这里串口信息的结构体或者变量自行定义
+
+extern volleyball_ball_posion ball_posion;
+
 
 // 监控命令行ctrl+c,用于手动退出
 void sigint_handler(int sig)
@@ -46,9 +80,17 @@ void sigint_handler(int sig)
 // 串口线程
 void serial_process()
 {
+    std::vector<double> msg;
+    //serial.init_port(config);
+
     while (state.load())
     {
-        sleep(3);
+        //msg.push_back(ball_posion.x); // 这里可以根据实际情况修改串口信息
+        //msg.push_back(ball_posion.y);
+        //msg.push_back(ball_posion.Deep);
+//
+        //serial.send_msg(msg);
+        
     }
 }
 // 处理线程
@@ -94,7 +136,7 @@ void detect_process(void)
             std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
             std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
 
-            usb_cam.usb_camera_detect(USB_frame, USB_detected_frame);
+            usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
 
             if (elapsed_seconds.count() >= 1)
             {
@@ -135,7 +177,7 @@ void grab_img(void)
     // 调用usb相机画面的实现函数
     cv::VideoCapture usb_camera_cap(0, cv::CAP_V4L2);
     cv::VideoWriter writer;
-    usb_cam.usb_camera_init(usb_cam, usb_camera_cap, writer);
+    usb_cam.usb_camera_init(usb_cam, usb_camera_cap, writer , config);
 
     int frame_count = 0;
     std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间

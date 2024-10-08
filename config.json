@@ -89,5 +89,12 @@
             335,
             433
         ]
+    },
+    "usbcamera":
+    {
+        "width": 640,
+        "height": 480,
+        "fps": 120,
+        "deep_num":18
     }
 }

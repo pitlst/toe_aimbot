@@ -4,6 +4,7 @@
 #include "usbcamera.hpp"
 #include <iostream>
 #include <string>
+#include "nlohmann/json.hpp"
 #include <opencv2/opencv.hpp>
 
 namespace toe
@@ -21,9 +22,10 @@ namespace toe
         usb_camera() = default;  // 构造函数
         ~usb_camera() = default; // 析构函数
 
-        void usb_camera_init(toe::usb_camera &usb_cam, cv::VideoCapture &capture, cv::VideoWriter &writer);
+        bool usb_camera_init(toe::usb_camera &usb_cam, cv::VideoCapture &capture, cv::VideoWriter &writer ,const nlohmann::json &input_json);
         void usb_camera_get_frame(cv::VideoCapture &capture, cv::Mat &frame);
-        void usb_camera_detect(cv::Mat &fram ,cv::Mat &result);
+        void usb_camera_detect(cv::Mat &frame, cv::Mat &result , const nlohmann::json &input_json);
+
 
     private:
         cv::VideoCapture cap;
@@ -33,6 +35,14 @@ namespace toe
     };
 
 }
+typedef struct
+{
+    double x;
+    double y;
+    double Deep;
+    
+}volleyball_ball_posion;
+
 
 bool color_judge(cv::Mat &frame);
 int rect_area_limit(int input , int limit_min, int limit_max) ;
