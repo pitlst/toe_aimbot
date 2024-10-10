@@ -81,44 +81,42 @@ void toe::usb_camera::usb_camera_detect(cv::Mat &frame, cv::Mat &result, const n
     cv::Mat hsvImage;
     cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
 
-    cv::Scalar lowerOrange1(10, 100, 100);
-    cv::Scalar upperOrange1(30, 255, 200);
-    cv::Scalar lowerOrange2(0, 100, 100);
-    cv::Scalar upperOrange2(10, 255, 200);
+    cv::GaussianBlur(hsvImage, hsvImage,cv::Size(3, 3),0);
+
+    cv::Scalar lowerOrange1(8, 110, 30);
+    cv::Scalar upperOrange1(26, 255, 200);
 
     // 橙色的掩膜
-    cv::Mat mask1, mask2;
-    cv::inRange(hsvImage, lowerOrange1, upperOrange1, mask1);
-    cv::inRange(hsvImage, lowerOrange2, upperOrange2, mask2);
-    cv::Mat mask = mask1 | mask2;
+    cv::Mat mask;
+    cv::inRange(hsvImage, lowerOrange1, upperOrange1, mask);
 
-    cv::Mat gery;
-    cv::cvtColor(mask, gery, cv::COLOR_GRAY2BGR);
+    //cv::erode(mask, mask, cv::Mat(), cv::Point(-1, -1), 2);
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(8, 8));
-
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9,9));
     // 应用开操作
-    cv::Mat openedImage;
-    cv::morphologyEx(mask, openedImage, cv::MORPH_OPEN, kernel);
+    //cv::Mat openedImage;
+    //cv::morphologyEx(mask, openedImage, cv::MORPH_OPEN, kernel);
+    cv::Mat closedImage;
+    cv::morphologyEx(mask, closedImage, cv::MORPH_CLOSE, kernel);
 
     // 检测
-    std::vector<cv::Vec3f> circles;
-    cv::HoughCircles(openedImage, circles, cv::HOUGH_GRADIENT, 1.5,
-                     openedImage.rows / 8, // change this value to detect circles with different distances to each other
-                     40, 20, 1, 100);     // change the last two values to detect circles with different sizes
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(closedImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
     // 绘制圆圈
-    for (size_t i = 0; i < circles.size(); i++)
+    for (size_t i = 0; i < contours.size(); i++)
     {
-        cv::Point2f center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-        int radius = cvRound(circles[i][2]);
-        // 绘制圆心
-        cv::circle(image, center, 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-        // 绘制圆轮廓
-        cv::circle(image, center, radius, cv::Scalar(0, 0, 255), 3, 8, 0);
-
-        if (i == circles.size() - 1)
+        cv::Point2f center;
+        float radius;
+        cv::minEnclosingCircle(contours[i], center, radius);
+        cv::Rect rect; 
+        rect= cv::boundingRect(contours[i]);
+        // 绘制最小包围圆
+        //判断条件：矩形宽高比小于1.3，半径在20-300之间
+        if (rect.width / rect.height < 1.2 && radius > 20 && radius < 300)
         {
+            cv::circle(image, center, radius, cv::Scalar(0, 255, 0), 2);
+
             ball_posion.x = center.x;
             ball_posion.y = center.y;
             ball_posion.Deep = deep_num * (1 / radius);
@@ -130,8 +128,9 @@ void toe::usb_camera::usb_camera_detect(cv::Mat &frame, cv::Mat &result, const n
             std::string text3 = "D:" + std::to_string(ball_posion.Deep);
 
             cv::Point org1(center.x, center.y);
-            cv::Point org2(center.x, center.y + 15);
-            cv::Point org3(center.x, center.y + 30);
+            cv::Point org2(center.x, center.y +15);
+            cv::Point org3(center.x, center.y +30);
+
 
             int fontFace = cv::FONT_HERSHEY_COMPLEX;
             double fontScale = 0.7;
@@ -141,7 +140,10 @@ void toe::usb_camera::usb_camera_detect(cv::Mat &frame, cv::Mat &result, const n
             cv::putText(image, text1, org1, fontFace, fontScale, color, thickness);
             cv::putText(image, text2, org2, fontFace, fontScale, color, thickness);
             cv::putText(image, text3, org3, fontFace, fontScale, color, thickness);
+
         }
+        
+
     }
 
     if (ball_flag == 0)
@@ -155,7 +157,9 @@ void toe::usb_camera::usb_camera_detect(cv::Mat &frame, cv::Mat &result, const n
     // std::cout<<"ball_posion.x:"<<ball_posion.x<<"ball_posion.y:"<<ball_posion.y<<"ball_posion.Deep:"<<ball_posion.Deep <<std::endl;
 
     cv::imshow("m", mask);
-    cv::imshow("o", openedImage);
+    cv::imshow("o", closedImage);
+    //cv::imshow("o", openedImage);
+
 }
 
 /// @brief   判断颜色
@@ -305,6 +309,108 @@ int rect_area_limit(int input, int limit_min, int limit_max)
 
     cv::imshow("m", mask);
     cv::imshow("o", openedImage);
+*/
+
+/*霍夫曼圆形检测
+
+    auto temp_para = input_json["usbcamera"];
+    int deep_num = temp_para["deep_num"].get<int>();
+
+    bool ball_flag = 0;
+
+    cv::Mat image = frame.clone();
+    if (image.empty())
+    {
+        std::cerr << "error:图像为空" << std::endl;
+        return;
+    }
+    
+    // 转换颜色空间到HSV
+    cv::Mat hsvImage;
+    cv::cvtColor(image, hsvImage, cv::COLOR_BGR2HSV);
+
+    cv::Scalar lowerOrange1(10, 100, 50);
+    cv::Scalar upperOrange1(30, 255, 200);
+    cv::Scalar lowerOrange2(0, 100, 50);
+    cv::Scalar upperOrange2(10, 255, 200);
+
+    // 橙色的掩膜
+    cv::Mat mask1, mask2;
+    cv::inRange(hsvImage, lowerOrange1, upperOrange1, mask1);
+    cv::inRange(hsvImage, lowerOrange2, upperOrange2, mask2);
+    cv::Mat mask = mask1 | mask2;
+
+    
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(8, 8));
+
+    // 应用开操作
+    cv::Mat openedImage;
+    cv::morphologyEx(mask, openedImage, cv::MORPH_OPEN, kernel);
+    
+
+    cv::Mat gery;
+    cv::cvtColor(image, gery, cv::COLOR_BGR2GRAY);
+
+    cv::GaussianBlur(gery, gery, cv::Size(3, 3), 0);
+    // 检测
+    std::vector<cv::Vec3f> circles;
+    cv::HoughCircles(gery, circles, cv::HOUGH_GRADIENT, 1.1,
+                     gery.rows / 8, // change this value to detect circles with different distances to each other
+                     130, 40, 30, 300);     // change the last two values to detect circles with different sizes
+    
+    // 绘制圆圈
+    for (size_t i = 0; i < circles.size(); i++)
+    {
+        cv::Point2f center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+        int radius = cvRound(circles[i][2]);
+        // 绘制圆心
+        cv::circle(image, center, 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+        // 绘制圆轮廓
+        cv::circle(image, center, radius, cv::Scalar(0, 0, 255), 3, 8, 0);
+
+        if (i == circles.size() - 1)
+        {
+             ball_posion.x = center.x;
+            ball_posion.y = center.y;
+            ball_posion.Deep = deep_num * (1 / circles[i][2]);
+
+            ball_flag = 1;
+
+            std::string text1 = "X:" + std::to_string(ball_posion.x);
+            std::string text2 = "Y:" + std::to_string(ball_posion.y);
+            std::string text3 = "D:" + std::to_string(ball_posion.Deep);
+
+            cv::Point org1(center.x, center.y);
+            cv::Point org2(center.x, center.y + 15);
+            cv::Point org3(center.x, center.y + 30);
+
+            int fontFace = cv::FONT_HERSHEY_COMPLEX;
+            double fontScale = 0.7;
+            cv::Scalar color(200, 0, 0);
+            int thickness = 1;
+
+            cv::putText(image, text1, org1, fontFace, fontScale, color, thickness);
+            cv::putText(image, text2, org2, fontFace, fontScale, color, thickness);
+            cv::putText(image, text3, org3, fontFace, fontScale, color, thickness);
+        
+        }
+        
+           
+    }
+
+    if (ball_flag == 0)
+    {
+        ball_posion.x = 320;
+        ball_posion.y = 240;
+        ball_posion.Deep = 0;
+    }
+    result = image;
+
+    // std::cout<<"ball_posion.x:"<<ball_posion.x<<"ball_posion.y:"<<ball_posion.y<<"ball_posion.Deep:"<<ball_posion.Deep <<std::endl;
+
+    cv::imshow("m", mask);
+    //cv::imshow("o", openedImage);
+
 */
 
 /*cv::Mat grad_x, grad_y, grey_img;

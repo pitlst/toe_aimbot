@@ -37,10 +37,12 @@ TOE实验室
 // 捕获ctrl+c的中断
 #include <signal.h>
 
+#include "detect.hpp"
 #include "camera.hpp"
 #include "nlohmann/json.hpp"
 #include "serial.hpp"
 #include "usbcamera.hpp"
+#include "openvino/openvino.hpp"
 
 #define DEBUG 1 // 调试开关
 
@@ -55,6 +57,8 @@ toe::hik_camera hik_cam; // 创建海康相机的对象
 toe::usb_camera usb_cam; // 创建usb相机的对象
 
 toe::serial serial; // 创建串口的对象
+
+toe::yolo yolo_class; // 创建yolo的对象
 
 nlohmann::json config;
 
@@ -100,7 +104,15 @@ void detect_process(void)
     cv::Mat USB_frame;
     cv::Mat USB_detected_frame;
 
+    ov::Core core;
+    ov::CompiledModel compiled_model;
+    ov::InferRequest infer_request;
+    yolo_class.core = core;
+    yolo_class.compiled_model = compiled_model;
+    yolo_class.infer_request = infer_request;
+    
     int k;
+    detect_init(yolo_class);
 
     int frame_count = 0;
     std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间
@@ -135,9 +147,11 @@ void detect_process(void)
 
             std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
             std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
-
-            usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
-
+            
+            //处理图像
+            //usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
+            detect_frame(yolo_class , USB_frame , USB_detected_frame);
+            
             if (elapsed_seconds.count() >= 1)
             {
                 usb_cam.FPS = frame_count / elapsed_seconds.count();
@@ -149,7 +163,7 @@ void detect_process(void)
 
             frame_count++;
 
-            if (DEBUG)
+            if (DEBUG)//调试内容
             {
                 cv::imshow("USB相机", USB_frame);
                 cv::imshow("USB相机处理后", USB_detected_frame);

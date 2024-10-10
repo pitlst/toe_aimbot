@@ -50,6 +50,7 @@ include_directories(
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}
+    /home/toe-volleyball/openvino/src/inference/include/**
     general
     camera
     serial
@@ -72,6 +73,8 @@ add_executable(${PROJECT_NAME}
                 usbcamera/usbcamera.cpp
                 serial/serial.hpp
                 serial/serial.cpp
+                detect/detect.hpp
+                detect/detect.cpp
                 general/nlohmann/json.hpp
                 general/structs.hpp
                 general/debug.hpp
