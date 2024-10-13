@@ -58,13 +58,12 @@ toe::usb_camera usb_cam; // 创建usb相机的对象
 
 toe::serial serial; // 创建串口的对象
 
-toe::yolo yolo_class; // 创建yolo的对象
+toe::ov_detect ov_detector; // 创建yolo的对象
 
 nlohmann::json config;
 
 cv::Mat usb_cam_frame; // 用于保存usb相机的图像
 
-// 任何跨线程的信息都需要使用锁来保护（这是啥子作用呢？）
 // 串口信息锁
 std::mutex serial_nutex;
 // 这里串口信息的结构体或者变量自行定义
@@ -104,15 +103,8 @@ void detect_process(void)
     cv::Mat USB_frame;
     cv::Mat USB_detected_frame;
 
-    ov::Core core;
-    ov::CompiledModel compiled_model;
-    ov::InferRequest infer_request;
-    yolo_class.core = core;
-    yolo_class.compiled_model = compiled_model;
-    yolo_class.infer_request = infer_request;
-    
     int k;
-    detect_init(yolo_class);
+    ov_detector.detect_init(config);
 
     int frame_count = 0;
     std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间
@@ -150,7 +142,7 @@ void detect_process(void)
             
             //处理图像
             //usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
-            detect_frame(yolo_class , USB_frame , USB_detected_frame);
+            ov_detector.detect();
             
             if (elapsed_seconds.count() >= 1)
             {
@@ -165,8 +157,9 @@ void detect_process(void)
 
             if (DEBUG)//调试内容
             {
-                cv::imshow("USB相机", USB_frame);
-                cv::imshow("USB相机处理后", USB_detected_frame);
+                //cv::imshow("USB相机", USB_frame);
+                
+                //cv::imshow("USB相机处理后", USB_detected_frame);
                 cv::waitKey(1);
             }
         }
@@ -200,19 +193,23 @@ void grab_img(void)
     {
 
         usb_cam.usb_camera_get_frame(usb_camera_cap, usb_cam_frame);
-
+        ov_detector.push_img(usb_cam_frame);
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
+        ov_detector.get_results();
 
+        ov_detector.show_results(usb_cam_frame);
+        //处理图像  
         if (elapsed_seconds.count() >= 1)
         {
             usb_cam.FPS = frame_count / elapsed_seconds.count();
-            //std::cout << "USB相机FPS:" << usb_cam.FPS << std::endl;
+            std::cout << "USB相机FPS:" << usb_cam.FPS << std::endl;
 
             prev_time = current_time;
             frame_count = 0; // 重置帧数
         }
-
+        cv::imshow("USB相机", usb_cam_frame);
+        cv::waitKey(1);
         frame_count++;
     }
 

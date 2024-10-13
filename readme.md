@@ -78,6 +78,43 @@ cmake --build . --parallel 8
 ```
 这样依赖库的准备基本上就完成了
 
+进行c++环境的openvino还需要编译安装下载并安装 OpenVINO 核心组件
+打开命令提示符终端窗口。
+可以使用键盘快捷键：Ctrl+Alt+T
+
+使用以下命令为 OpenVINO 创建文件夹。如果该文件夹已存在，请跳过此步骤。
+```
+sudo mkdir /opt/intel
+```
+浏览到当前用户的文件夹
+```
+cd <user_home>/Downloads
+```
+下载系统的 OpenVINO Runtime 存档文件，提取文件，重命名提取的文件夹并将其移动到所需的路径：
+这里使用的是ubuntu22.04版本
+```
+curl -L https://storage.openvinotoolkit.org/repositories/openvino/packages/2024.4/linux/l_openvino_toolkit_ubuntu22_2024.4.0.16579.c3152d32c9c_x86_64.tgz --output openvino_2024.4.0.tgz
+tar -xf openvino_2024.4.0.tgz
+sudo mv l_openvino_toolkit_ubuntu22_2024.4.0.16579.c3152d32c9c_x86_64 /opt/intel/openvino_2024.4.0
+```
+在 Linux 上安装所需的系统依赖项。为此，OpenVINO 在解压缩的安装目录中提供了一个脚本。运行以下命令：
+```
+cd /opt/intel/openvino_2024.4.0
+sudo -E ./install_dependencies/install_openvino_dependencies.sh
+```
+创建符号链接
+```
+cd /opt/intel
+sudo ln -s openvino_2024.4.0 openvino_2024
+```
+该文件夹现在包含 OpenVINO 的核心组件。 
+最后，将环境变量添加到 ~/.bashrc 文件中。
+```
+source /opt/intel/openvino_2024/setupvars.sh
+```
+### 安装海康sdk
+[到官网下载](https://www.hikrobotics.com/cn/machinevision/service/download/?module=0)
+下载ubuntu的sdk后编译
 ## 项目运行
 编译
 ```
