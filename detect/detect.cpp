@@ -6,85 +6,106 @@
 #include <string>
 #include <vector>
 
-bool toe::ov_detect::detect_init(const nlohmann::json &input_json)
+void toe::ov_detect_base::Init(const nlohmann::json &input_json, int color)
 {
+    // 利用json文件初始化参数
     nlohmann::json temp_json = input_json;
 
-    /*
-        std::vector<float> temp_vector;
-        for (nlohmann::json ch : temp_json["anchors"]["1"])
-        {
-            temp_vector.emplace_back(ch.get<int>());
-        }
-        param_.a1 = temp_vector;
-        temp_vector.clear();
-        for (nlohmann::json ch : temp_json["anchors"]["2"])
-        {
-            temp_vector.emplace_back(ch.get<int>());
-        }
-        param_.a2 = temp_vector;
-        temp_vector.clear();
-        for (nlohmann::json ch : temp_json["anchors"]["3"])
-        {
-            temp_vector.emplace_back(ch.get<int>());
-        }
-        param_.a3 = temp_vector;
-        temp_vector.clear();
-        for (nlohmann::json ch : temp_json["anchors"]["4"])
-        {
-            temp_vector.emplace_back(ch.get<int>());
-        }
-        param_.a4 = temp_vector;
-        temp_vector.clear();
-    */
-    compiled_model = core.compile_model("/home/toe-volleyball/toe_aimbot/data/best_openvino_model/best.xml", "CPU");
-    infer_request = compiled_model.create_infer_request();
+    param_.engine_file_path = temp_json["path"]["engine_file_path"].get<std::string>();
+    param_.bin_file_path = temp_json["path"]["bin_file_path"].get<std::string>();
+    param_.xml_file_path = temp_json["path"]["xml_file_path"].get<std::string>();
 
-    auto out_node = compiled_model.outputs();
-    out_tensor_size = out_node.size();
-    /*
-        for (auto out_n : out_node)
-        {
-            auto out_name = out_n.get_any_name();
-            if (out_name == "stride_8")
-            {
-                anchors.emplace_back(param_.a2);
-                stride_.emplace_back(8);
-            }
-            else if (out_name == "stride_16")
-            {
-                anchors.emplace_back(param_.a3);
-                stride_.emplace_back(16);
-            }
-            else if (out_name == "stride_32")
-            {
-                anchors.emplace_back(param_.a4);
-                stride_.emplace_back(32);
-            }
-        }
-    */
-    stride_.emplace_back(8);
-    std::cout << "network_init_done. " << std::endl;
-    blob.resize(640 * 640 * 3);
-    return true;
+    param_.camp = color;
+
+    param_.batch_size = temp_json["NCHW"]["openvino"]["batch_size"].get<int>();
+    param_.c = temp_json["NCHW"]["openvino"]["C"].get<int>();
+    param_.w = temp_json["NCHW"]["openvino"]["W"].get<int>();
+    param_.h = temp_json["NCHW"]["openvino"]["H"].get<int>();
+
+    param_.width = temp_json["camera"]["0"]["width"].get<int>();
+    param_.height = temp_json["camera"]["0"]["height"].get<int>();
+
+    param_.nms_thresh = temp_json["thresh"]["nms_thresh"].get<double>();
+    param_.bbox_conf_thresh = temp_json["thresh"]["bbox_conf_thresh"].get<double>();
+    param_.merge_thresh = temp_json["thresh"]["merge_thresh"].get<double>();
+
+    param_.classes = temp_json["nums"]["classes"].get<int>();
+    //param_.sizes = temp_json["nums"]["sizes"].get<int>();
+    //param_.colors = temp_json["nums"]["colors"].get<int>();
+    param_.kpts = temp_json["nums"]["kpts"].get<int>();
+
+    std::vector<float> temp_vector;
+    for (nlohmann::json ch : temp_json["anchors"]["1"])
+    {
+        temp_vector.emplace_back(ch.get<int>());
+    }
+    param_.a1 = temp_vector;
+    temp_vector.clear();
+    for (nlohmann::json ch : temp_json["anchors"]["2"])
+    {
+        temp_vector.emplace_back(ch.get<int>());
+    }
+    param_.a2 = temp_vector;
+    temp_vector.clear();
+    for (nlohmann::json ch : temp_json["anchors"]["3"])
+    {
+        temp_vector.emplace_back(ch.get<int>());
+    }
+    param_.a3 = temp_vector;
+    temp_vector.clear();
+    for (nlohmann::json ch : temp_json["anchors"]["4"])
+    {
+        temp_vector.emplace_back(ch.get<int>());
+    }
+    param_.a4 = temp_vector;
+    temp_vector.clear();
 }
 
+bool toe::ov_detect::detect_init(const nlohmann::json &input_json, int color)
+{
+    nlohmann::json temp_json = input_json;
+    toe::ov_detect_base::Init(temp_json, color);
+    // 子类初始化
+    std::cout << "load network" << std::endl;
+    // 加载模型
+    // std::cout <<param_.xml_file_path<<std::endl;
+    std::shared_ptr<ov::Model> model = core.read_model(std::string(PROJECT_PATH) + param_.xml_file_path, std::string(PROJECT_PATH) + param_.bin_file_path);
+    ov::CompiledModel compiled_model = core.compile_model(model, "CPU");
+    // 创建推理请求
+
+    infer_request = compiled_model.create_infer_request();
+    // 因为网络是8，32，16的排列，所以anchor对应的排列需要更改
+    
+    auto out_node = compiled_model.outputs();
+
+    out_tensor_size = out_node.size();
+
+    //设定输入网络为FP16
+    anchors.emplace_back(param_.a3);
+    stride_.emplace_back(16);
+
+    std::cout << "network_init_done. " << std::endl;
+    blob.resize(param_.w * param_.h * 3);
+    return true;
+}
+// 推理预处理部分
 void toe::ov_detect::preprocess(void)
 {
 
     ov::Tensor input_tensor = infer_request.get_input_tensor();
     auto data1 = input_tensor.data<float>();
     // 输入图像预处理
-
-    cv::resize(input_image, input_image, cv::Size(640, 640));
+    // 干成640*640
+    cv::resize(input_img, input_img, cv::Size(640, 640));
     // 归一化
-    int img_h = input_image.rows;
-    int img_w = input_image.cols;
+    int img_h = input_img.rows;
+    int img_w = input_img.cols;
     float *blob_data = blob.data();
+
     size_t i = 0;
     for (size_t row = 0; row < img_h; ++row)
     {
-        uchar *uc_pixel = input_image.data + row * input_image.step;
+        uchar *uc_pixel = input_img.data + row * input_img.step;
         for (size_t col = 0; col < img_w; ++col)
         {
             // 三通道
@@ -100,9 +121,17 @@ void toe::ov_detect::preprocess(void)
     std::memcpy(data1, blob.data(), sizeof(float) * blob.size());
 }
 
+void toe::ov_detect::inference(void)
+{
+    // 推理
+    //infer_request.infer();
+    infer_request.start_async();
+infer_request.wait();
+}
+
 void toe::ov_detect::postprocess(void)
 {
-    output_data_.clear();
+    output_nms_.clear();
     // 解码网络输出
     for (size_t i = 0; i < out_tensor_size; i++)
     {
@@ -116,7 +145,8 @@ void toe::ov_detect::postprocess(void)
         std::vector<float> *l_anchor = &(anchors[i]);
         int out_h = 640 / now_stride;
         int out_w = 640 / now_stride;
-        int num_out = 5 + 10 + 1;
+        int num_out = 5 + 10 + param_.classes;
+        
         float pred_data[num_out] = {0};
         // 图像三通道
         for (int na = 0; na < 3; ++na)
@@ -127,33 +157,109 @@ void toe::ov_detect::postprocess(void)
                 {
                     pred_data[num_out] = {0};
                     int data_idx = (na * out_h * out_w + h_id * out_w + w_id) * num_out;
+                    //std::cout << "data_idx is " << data_idx << std::endl;
                     // 计算当前框的目标存在置信度
                     double obj_conf = toe::sigmoid(out_data[data_idx + 4]);
-                    if (obj_conf > 0.8)
+                    //std::cout << "obj_conf is " << obj_conf << std::endl;
+                    if (obj_conf > param_.bbox_conf_thresh)
                     {
+                        std::cout << "ok " <<  std::endl;
                         toe::sigmoid(out_data + data_idx, pred_data, 5);
-                        toe::sigmoid(out_data + data_idx + 15, pred_data + 15, 1);
+                        toe::sigmoid(out_data + data_idx + 15, pred_data + 15, param_.classes );
                         std::memcpy(pred_data + 5, out_data + data_idx + 5, sizeof(float) * 10);
 
+
+                        //std::cout << pred_data[0] << std::endl;
+                        //std::cout << pred_data[1] << std::endl;
+                        //std::cout << pred_data[2] << std::endl;
+                        //std::cout << pred_data[3] << std::endl;
+                        //// // obj概率
+                        //std::cout << "obj" << std::endl;
+                        //std::cout << pred_data[4] << std::endl;
+                        //std::cout << pred_data[5] << std::endl;
+                        //std::cout << pred_data[6] << std::endl;
+                        //std::cout << pred_data[7] << std::endl;
+                        //std::cout << pred_data[8] << std::endl;
+                        //std::cout << pred_data[9] << std::endl;
+                        //std::cout << pred_data[10] << std::endl;
+                        //std::cout << pred_data[11] << std::endl;
+                        //std::cout << pred_data[12] << std::endl;
+                        //std::cout << pred_data[13] << std::endl;
+                        //std::cout << pred_data[14] << std::endl;
+                        //// // 对应类别概率
+                        //// std::cout << "classes" << std::endl;
+                        //std::cout << pred_data[15] << std::endl;
+                        //std::cout << pred_data[16] << std::endl;
+                        // std::cout << pred_data[17] << std::endl;
+                        // std::cout << pred_data[18] << std::endl;
+                        // std::cout << pred_data[19] << std::endl;
+                        // std::cout << pred_data[20] << std::endl;
+                        // std::cout << pred_data[21] << std::endl;
+                        // std::cout << pred_data[22] << std::endl;
+                        // // 对应颜色概率
+                        // std::cout << "color" << std::endl;
+                        // std::cout << pred_data[23] << std::endl;
+                        // std::cout << pred_data[24] << std::endl;
+                        // std::cout << pred_data[25] << std::endl;
+                        // std::cout << pred_data[26] << std::endl;
+                        // // 对应大小概率
+                        // std::cout << "size" << std::endl;
+                        // std::cout << pred_data[27] << std::endl;
+                        // std::cout << pred_data[28] << std::endl;
+
+                        // throw std::logic_error("");
                         // 计算当前框的颜色
-                        int col_id = std::max_element(pred_data + 15 + 1,
-                                                      pred_data + 15 + 1) -
-                                     (pred_data + 15 + 1);
+                        //int col_id = std::max_element(pred_data + 15 + param_.classes,pred_data + 15 + param_.classes ) - (pred_data + 15 + param_.classes);
+
+                        // std::cout << "col_id is " << col_id << std::endl;
+                        // 颜色不同停止计算
+                        //if (col_id == param_.camp)
+                        //{
+                        //    continue;
+                        //}
+
+                        // std::cout << "color" << std::endl;
+                        // std::cout << col_id << std::endl; 
+                        // std::cout << param_.classes << std::endl;
+                        // std::cout << pred_data[23] << std::endl;
+                        // std::cout << pred_data[24] << std::endl;
+                        // std::cout << pred_data[25] << std::endl;
+                        // std::cout << pred_data[26] << std::endl;
 
                         // 计算当前框的类别
+                        int cls_id = std::max_element(pred_data + 15, pred_data + 15 + param_.classes) - (pred_data + 15);
+                        std::cout<< cls_id<< std::endl;
+                        // 计算是否是大小装甲
+                        //int t_size = std::max_element(pred_data + 15 + param_.classes + param_.colors, pred_data + 15 + param_.classes + param_.colors + 2) - (pred_data + 15 + param_.classes + param_.colors);
 
-                        int cls_id = std::max_element(pred_data + 15, pred_data + 15 + 1) - (pred_data + 15);
-
-                        std::cout << cls_id << std::endl;
                         // 计算当前框的最终置信度
-                        double final_conf = obj_conf * std::pow(pred_data[15 + cls_id] *
-                                                                    pred_data[15 + 1 + col_id] *
-                                                                    pred_data[15 + 1],
-                                                                1 / 3.);
+                        // std::cout << pred_data[15 + param_.classes + 0] << std::endl;
+                        // std::cout << pred_data[15 + param_.classes + 1] << std::endl;
+                        // std::cout << pred_data[15 + param_.classes + 2] << std::endl;
+                        // std::cout << pred_data[15 + param_.classes + 3] << std::endl;
+                        // std::cout << pred_data[15 + param_.classes + param_.colors + 0] << std::endl;
+                        // std::cout << pred_data[15 + param_.classes + param_.colors + 1] << std::endl;
 
-                        if (final_conf > 0.8)
+                        // std::cout << pred_data[15 + cls_id] << std::endl;
+                        // std::cout << "color" << std::endl;
+                        // std::cout << pred_data[23] << std::endl;
+                        // std::cout << pred_data[24] << std::endl;
+                        // std::cout << pred_data[25] << std::endl;
+                        // std::cout << pred_data[26] << std::endl;
+                        // std::cout << "color is " << pred_data[15 + param_.classes + col_id]  * 100 << std::endl;
+                        // std::cout << pred_data[15 + param_.classes + param_.colors + t_size] * 100 << std::endl;
+                        // std::cout << "size is " << pred_data[15 + param_.classes + param_.colors + 2 + t_size] * 100 << std::endl;
+                         std::cout << "obj_conf is " << obj_conf <<std::endl;
+                        double final_conf = obj_conf * std::pow(pred_data[15 + cls_id] *
+                                                                    pred_data[15 + param_.classes ] ,
+                                                                0.5);
+
+                        // double final_conf = obj_conf * pred_data[15 + cls_id];
+                        std::cout<<"final_conf is " <<final_conf<< std::endl;
+                        if (final_conf > param_.bbox_conf_thresh)
                         {
                             nums++;
+                            std::cout << "final_conf is ok " <<  std::endl;
                             volleyball_data now;
                             float x = (pred_data[0] * 2.0 - 0.5 + w_id) * now_stride;
                             float y = (pred_data[1] * 2.0 - 0.5 + h_id) * now_stride;
@@ -185,7 +291,7 @@ void toe::ov_detect::postprocess(void)
                             // now.color = col_id;
                             now.type = cls_id;
                             // now.t_size = t_size;
-                            output_data_.emplace_back(now);
+                            output_nms_.emplace_back(now);
                         }
                     }
                 }
@@ -193,20 +299,20 @@ void toe::ov_detect::postprocess(void)
         }
     }
 
-    std::cout << "output_data_ is " << output_data_.size() << std::endl;
+    //std::cout << "output_data_ is " << output_nms_.size() << std::endl;
 
     // nms去除重叠装甲板
     output_data.clear();
     std::vector<pick_merge_store> picked;
-    std::sort(output_data_.begin(), output_data_.end(), [](const volleyball_data &a, const volleyball_data &b)
+    std::sort(output_nms_.begin(), output_nms_.end(), [](const volleyball_data &a, const volleyball_data &b)
               { return a.conf > b.conf; });
-    for (int i = 0; i < output_data_.size(); ++i)
+    for (int i = 0; i < output_nms_.size(); ++i)
     {
-        volleyball_data &now = output_data_[i];
+        volleyball_data &now = output_nms_[i];
         bool keep = true;
         for (int j = 0; j < picked.size(); ++j)
         {
-            volleyball_data &pre = output_data_[picked[j].id];
+            volleyball_data &pre = output_nms_[picked[j].id];
             float iou = calc_iou(now, pre);
             if (iou > 0.8)
             {
@@ -232,7 +338,7 @@ void toe::ov_detect::postprocess(void)
     for (int i = 0; i < picked.size(); ++i)
     {
         int merge_num = picked[i].merge_confs.size();
-        volleyball_data now = output_data_[picked[i].id];
+        volleyball_data now = output_nms_[picked[i].id];
         double conf_sum = now.conf;
         for (int j = 0; j < 5; ++j)
         {
@@ -254,14 +360,8 @@ void toe::ov_detect::postprocess(void)
     }
 }
 
-void toe::ov_detect::inference(void)
-{
-    // 推理
-    infer_request.infer();
-}
-
 // 推送图像到队列中
-void toe::ov_detect::push_img(const cv::Mat &img)
+void toe::ov_detect_base::push_img(const cv::Mat &img)
 {
     img_mutex_.lock();
     if (input_imgs.size() >= max_size_)
@@ -272,7 +372,7 @@ void toe::ov_detect::push_img(const cv::Mat &img)
     img_mutex_.unlock();
 }
 
-bool toe::ov_detect::show_results(cv::Mat &img)
+bool toe::ov_detect_base::show_results(cv::Mat &img)
 {
     cv::resize(img, img, cv::Size(640, 640));
     cv::Point ct0, ct1, ct2, ct3;
@@ -284,24 +384,24 @@ bool toe::ov_detect::show_results(cv::Mat &img)
 }
 
 // 获取输出结果进到olleyball_data中
-std::vector<volleyball_data> toe::ov_detect::get_results()
+std::vector<volleyball_data> toe::ov_detect_base::get_results()
 {
     std::vector<volleyball_data> temp_return;
-    output_data_mutex.lock();
-    temp_return = output_data_;
-    output_data_mutex.unlock();
+    outputs_mutex_.lock();
+    temp_return = output_data;
+    outputs_mutex_.unlock();
     return temp_return;
 }
 
-bool toe::ov_detect::detect()
+bool toe::ov_detect_base::detect()
 {
     if (!input_imgs.empty())
     {
         // std::cout << "read" << std::endl;
-        input_image_mutex.lock();
-        input_image = input_imgs.back();
+        img_mutex_.lock();
+        input_img = input_imgs.back();
         input_imgs.clear();
-        input_image_mutex.unlock();
+        img_mutex_.unlock();
 
         // std::cout << "trans" << std::endl;
         preprocess();

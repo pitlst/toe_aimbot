@@ -58,6 +58,8 @@ toe::usb_camera usb_cam; // 创建usb相机的对象
 toe::serial serial; // 创建串口的对象
 
 toe::ov_detect ov_detector; // 创建yolo的对象
+ // 创建父类////
+//toe::ov_detect_base ov_detector_base;
 
 nlohmann::json config;
 
@@ -103,7 +105,8 @@ void detect_process(void)
     cv::Mat USB_detected_frame;
 
     int k;
-    ov_detector.detect_init(config);
+    int color = 0;
+    ov_detector.detect_init(config , color);
 
     int frame_count = 0;
     std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间
@@ -195,7 +198,7 @@ void grab_img(void)
         ov_detector.push_img(usb_cam_frame);
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
-        ov_detector.get_results();
+        //ov_detector.get_results();
 
         ov_detector.show_results(usb_cam_frame);
         //处理图像  

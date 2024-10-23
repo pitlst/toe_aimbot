@@ -1,8 +1,8 @@
 {
     "path": {
         "engine_file_path": "data/weights/yolo.engine",
-        "bin_file_path": "data/weights/2.bin",
-        "xml_file_path": "data/weights/2.xml",
+        "bin_file_path": "data/best_openvino_model/best.bin",
+        "xml_file_path": "data/best_openvino_model/best.xml",
         "serial_path": "/dev/ttyACM0"
     },
     "determine": {
@@ -57,9 +57,7 @@
         "max_wellid_distance": 8
     },
     "nums": {
-        "classes": 8,
-        "sizes": 2,
-        "colors": 4,
+        "classes": 1,
         "kpts": 8
     },
     "z_scale": 67116,
