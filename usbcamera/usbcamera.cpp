@@ -49,7 +49,7 @@ void toe::usb_camera::usb_camera_get_frame(cv::VideoCapture &capture, cv::Mat &f
 {
 
     //capture >> frame;
-    frame = cv::imread("/home/toe-volleyball/20241018_10587.jpg");
+    frame = cv::imread("/home/toe-volleyball/toe_aimbot/data/best_openvino_model/20241018_10587.jpg");
     usb_mutex_array[0].lock();
     usb_frame_array[0] = frame.clone();
     usb_mutex_array[0].unlock();

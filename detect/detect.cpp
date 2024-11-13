@@ -6,6 +6,12 @@
 #include <string>
 #include <vector>
 
+#define DEBUG 1
+
+std::vector<cv::Scalar> colors = {cv::Scalar(0, 0, 255), cv::Scalar(0, 255, 0), cv::Scalar(255, 0, 0),
+                                  cv::Scalar(255, 100, 50), cv::Scalar(50, 100, 255), cv::Scalar(255, 50, 100)};
+const std::vector<std::string> class_names = {"volleyball"};
+
 void toe::ov_detect_base::Init(const nlohmann::json &input_json, int color)
 {
     // 利用json文件初始化参数
@@ -30,10 +36,9 @@ void toe::ov_detect_base::Init(const nlohmann::json &input_json, int color)
     param_.merge_thresh = temp_json["thresh"]["merge_thresh"].get<double>();
 
     param_.classes = temp_json["nums"]["classes"].get<int>();
-    //param_.sizes = temp_json["nums"]["sizes"].get<int>();
-    //param_.colors = temp_json["nums"]["colors"].get<int>();
-    param_.kpts = temp_json["nums"]["kpts"].get<int>();
 
+    param_.debug = temp_json["DEBUG"].get<bool>();
+    
     std::vector<float> temp_vector;
     for (nlohmann::json ch : temp_json["anchors"]["1"])
     {
@@ -70,24 +75,43 @@ bool toe::ov_detect::detect_init(const nlohmann::json &input_json, int color)
     // 加载模型
     // std::cout <<param_.xml_file_path<<std::endl;
     std::shared_ptr<ov::Model> model = core.read_model(std::string(PROJECT_PATH) + param_.xml_file_path, std::string(PROJECT_PATH) + param_.bin_file_path);
-    ov::CompiledModel compiled_model = core.compile_model(model, "CPU");
+    ov_detect::compiled_model = core.compile_model(model, "CPU",ov::hint::performance_mode(ov::hint::PerformanceMode::THROUGHPUT));
     // 创建推理请求
 
     infer_request = compiled_model.create_infer_request();
     // 因为网络是8，32，16的排列，所以anchor对应的排列需要更改
-    
+
     auto out_node = compiled_model.outputs();
 
-    out_tensor_size = out_node.size();
-
-    //设定输入网络为FP16
+    //out_tensor_size = out_node.size();
+    //std::cout << "out_tensor_size is " << out_tensor_size << std::endl;
+    // 设定输入网络为FP16
     anchors.emplace_back(param_.a3);
     stride_.emplace_back(16);
+
+////////////////////////////////////////
+    short width, height;
+
+    const std::vector<ov::Output<ov::Node>> inputs = model->inputs();
+    const ov::Shape input_shape = inputs[0].get_shape();
+
+    height = input_shape[1];
+    width = input_shape[2];
+    model_input_shape_ = cv::Size2f(width, height);
+
+    const std::vector<ov::Output<ov::Node>> outputs = model->outputs();
+    const ov::Shape output_shape = outputs[0].get_shape();
+
+    height = output_shape[1];
+    width = output_shape[2];
+    model_output_shape_ = cv::Size(width, height);
 
     std::cout << "network_init_done. " << std::endl;
     blob.resize(param_.w * param_.h * 3);
     return true;
+    /////////////////////////////////
 }
+
 // 推理预处理部分
 void toe::ov_detect::preprocess(void)
 {
@@ -101,6 +125,9 @@ void toe::ov_detect::preprocess(void)
     int img_h = input_img.rows;
     int img_w = input_img.cols;
     float *blob_data = blob.data();
+
+    scale_factor_.x = static_cast<float>(input_img.cols / model_input_shape_.width);
+    scale_factor_.y = static_cast<float>(input_img.rows / model_input_shape_.height);
 
     size_t i = 0;
     for (size_t row = 0; row < img_h; ++row)
@@ -124,240 +151,30 @@ void toe::ov_detect::preprocess(void)
 void toe::ov_detect::inference(void)
 {
     // 推理
-    //infer_request.infer();
-    infer_request.start_async();
-infer_request.wait();
+    infer_request.infer();
 }
 
 void toe::ov_detect::postprocess(void)
 {
-    output_nms_.clear();
-    // 解码网络输出
-    for (size_t i = 0; i < out_tensor_size; i++)
-    {
-        // 获取输出tensor的指针
-        ov::Tensor output_tensor = infer_request.get_output_tensor(i);
-        const float *out_data = output_tensor.data<float>();
-
-        int nums = 0;
-        int now_stride = stride_[i];
-        // std::cout<<"1111111111111"<<std::endl;
-        std::vector<float> *l_anchor = &(anchors[i]);
-        int out_h = 640 / now_stride;
-        int out_w = 640 / now_stride;
-        int num_out = 5 + 10 + param_.classes;
-        
-        float pred_data[num_out] = {0};
-        // 图像三通道
-        for (int na = 0; na < 3; ++na)
-        {
-            for (int h_id = 0; h_id < out_h; ++h_id)
-            {
-                for (int w_id = 0; w_id < out_w; ++w_id)
-                {
-                    pred_data[num_out] = {0};
-                    int data_idx = (na * out_h * out_w + h_id * out_w + w_id) * num_out;
-                    //std::cout << "data_idx is " << data_idx << std::endl;
-                    // 计算当前框的目标存在置信度
-                    double obj_conf = toe::sigmoid(out_data[data_idx + 4]);
-                    //std::cout << "obj_conf is " << obj_conf << std::endl;
-                    if (obj_conf > param_.bbox_conf_thresh)
-                    {
-                        std::cout << "ok " <<  std::endl;
-                        toe::sigmoid(out_data + data_idx, pred_data, 5);
-                        toe::sigmoid(out_data + data_idx + 15, pred_data + 15, param_.classes );
-                        std::memcpy(pred_data + 5, out_data + data_idx + 5, sizeof(float) * 10);
+   
+}
 
 
-                        //std::cout << pred_data[0] << std::endl;
-                        //std::cout << pred_data[1] << std::endl;
-                        //std::cout << pred_data[2] << std::endl;
-                        //std::cout << pred_data[3] << std::endl;
-                        //// // obj概率
-                        //std::cout << "obj" << std::endl;
-                        //std::cout << pred_data[4] << std::endl;
-                        //std::cout << pred_data[5] << std::endl;
-                        //std::cout << pred_data[6] << std::endl;
-                        //std::cout << pred_data[7] << std::endl;
-                        //std::cout << pred_data[8] << std::endl;
-                        //std::cout << pred_data[9] << std::endl;
-                        //std::cout << pred_data[10] << std::endl;
-                        //std::cout << pred_data[11] << std::endl;
-                        //std::cout << pred_data[12] << std::endl;
-                        //std::cout << pred_data[13] << std::endl;
-                        //std::cout << pred_data[14] << std::endl;
-                        //// // 对应类别概率
-                        //// std::cout << "classes" << std::endl;
-                        //std::cout << pred_data[15] << std::endl;
-                        //std::cout << pred_data[16] << std::endl;
-                        // std::cout << pred_data[17] << std::endl;
-                        // std::cout << pred_data[18] << std::endl;
-                        // std::cout << pred_data[19] << std::endl;
-                        // std::cout << pred_data[20] << std::endl;
-                        // std::cout << pred_data[21] << std::endl;
-                        // std::cout << pred_data[22] << std::endl;
-                        // // 对应颜色概率
-                        // std::cout << "color" << std::endl;
-                        // std::cout << pred_data[23] << std::endl;
-                        // std::cout << pred_data[24] << std::endl;
-                        // std::cout << pred_data[25] << std::endl;
-                        // std::cout << pred_data[26] << std::endl;
-                        // // 对应大小概率
-                        // std::cout << "size" << std::endl;
-                        // std::cout << pred_data[27] << std::endl;
-                        // std::cout << pred_data[28] << std::endl;
 
-                        // throw std::logic_error("");
-                        // 计算当前框的颜色
-                        //int col_id = std::max_element(pred_data + 15 + param_.classes,pred_data + 15 + param_.classes ) - (pred_data + 15 + param_.classes);
+/// @brief 
+/// @param src 
+/// @return 
+cv::Rect2f toe::ov_detect::GetBoundingBox(const cv::Rect2f &src) const
+{
+    cv::Rect2f box = src;
 
-                        // std::cout << "col_id is " << col_id << std::endl;
-                        // 颜色不同停止计算
-                        //if (col_id == param_.camp)
-                        //{
-                        //    continue;
-                        //}
+    box.width = 1.0 * (box.width - box.x) * scale_factor_.x;
+    box.height = 1.0 * (box.height - box.y) * scale_factor_.y;
 
-                        // std::cout << "color" << std::endl;
-                        // std::cout << col_id << std::endl; 
-                        // std::cout << param_.classes << std::endl;
-                        // std::cout << pred_data[23] << std::endl;
-                        // std::cout << pred_data[24] << std::endl;
-                        // std::cout << pred_data[25] << std::endl;
-                        // std::cout << pred_data[26] << std::endl;
+    box.x *= scale_factor_.x;
+    box.y *= scale_factor_.y;
 
-                        // 计算当前框的类别
-                        int cls_id = std::max_element(pred_data + 15, pred_data + 15 + param_.classes) - (pred_data + 15);
-                        std::cout<< cls_id<< std::endl;
-                        // 计算是否是大小装甲
-                        //int t_size = std::max_element(pred_data + 15 + param_.classes + param_.colors, pred_data + 15 + param_.classes + param_.colors + 2) - (pred_data + 15 + param_.classes + param_.colors);
-
-                        // 计算当前框的最终置信度
-                        // std::cout << pred_data[15 + param_.classes + 0] << std::endl;
-                        // std::cout << pred_data[15 + param_.classes + 1] << std::endl;
-                        // std::cout << pred_data[15 + param_.classes + 2] << std::endl;
-                        // std::cout << pred_data[15 + param_.classes + 3] << std::endl;
-                        // std::cout << pred_data[15 + param_.classes + param_.colors + 0] << std::endl;
-                        // std::cout << pred_data[15 + param_.classes + param_.colors + 1] << std::endl;
-
-                        // std::cout << pred_data[15 + cls_id] << std::endl;
-                        // std::cout << "color" << std::endl;
-                        // std::cout << pred_data[23] << std::endl;
-                        // std::cout << pred_data[24] << std::endl;
-                        // std::cout << pred_data[25] << std::endl;
-                        // std::cout << pred_data[26] << std::endl;
-                        // std::cout << "color is " << pred_data[15 + param_.classes + col_id]  * 100 << std::endl;
-                        // std::cout << pred_data[15 + param_.classes + param_.colors + t_size] * 100 << std::endl;
-                        // std::cout << "size is " << pred_data[15 + param_.classes + param_.colors + 2 + t_size] * 100 << std::endl;
-                         std::cout << "obj_conf is " << obj_conf <<std::endl;
-                        double final_conf = obj_conf * std::pow(pred_data[15 + cls_id] *
-                                                                    pred_data[15 + param_.classes ] ,
-                                                                0.5);
-
-                        // double final_conf = obj_conf * pred_data[15 + cls_id];
-                        std::cout<<"final_conf is " <<final_conf<< std::endl;
-                        if (final_conf > param_.bbox_conf_thresh)
-                        {
-                            nums++;
-                            std::cout << "final_conf is ok " <<  std::endl;
-                            volleyball_data now;
-                            float x = (pred_data[0] * 2.0 - 0.5 + w_id) * now_stride;
-                            float y = (pred_data[1] * 2.0 - 0.5 + h_id) * now_stride;
-                            float w = std::pow(pred_data[2] * 2, 2) * l_anchor->at(na * 2);
-                            float h = std::pow(pred_data[3] * 2, 2) * l_anchor->at(na * 2 + 1);
-                            for (int p = 0; p < 5; ++p)
-                            {
-                                float px = (pred_data[5 + p * 2] * l_anchor->at(na * 2) + w_id * now_stride);
-                                float py = (pred_data[5 + p * 2 + 1] * l_anchor->at(na * 2 + 1) + h_id * now_stride);
-                                px = std::max(std::min(px, (float)(640)), 0.f);
-                                py = std::max(std::min(py, (float)(640)), 0.f);
-                                now.pts[p] = cv::Point2f(px, py);
-                            }
-                            float x0 = x - w * 0.5;
-                            float y0 = y - h * 0.5;
-                            float x1 = x + w * 0.5;
-                            float y1 = y + h * 0.5;
-
-                            // 检查输出目标的上下界，应当在640和0之间
-                            x0 = std::max(std::min(x0, (float)(640.0f)), 0.f);
-                            y0 = std::max(std::min(y0, (float)(640.0f)), 0.f);
-                            x1 = std::max(std::min(x1, (float)(640.0f)), 0.f);
-                            y1 = std::max(std::min(y1, (float)(640.0f)), 0.f);
-
-                            now.ball_x = (x0 + x1) / 2;
-                            now.ball_y = (y0 + y1) / 2;
-                            now.rect = cv::Rect(x0, y0, x1 - x0, y1 - y0);
-                            // now.conf = final_conf;
-                            // now.color = col_id;
-                            now.type = cls_id;
-                            // now.t_size = t_size;
-                            output_nms_.emplace_back(now);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    //std::cout << "output_data_ is " << output_nms_.size() << std::endl;
-
-    // nms去除重叠装甲板
-    output_data.clear();
-    std::vector<pick_merge_store> picked;
-    std::sort(output_nms_.begin(), output_nms_.end(), [](const volleyball_data &a, const volleyball_data &b)
-              { return a.conf > b.conf; });
-    for (int i = 0; i < output_nms_.size(); ++i)
-    {
-        volleyball_data &now = output_nms_[i];
-        bool keep = true;
-        for (int j = 0; j < picked.size(); ++j)
-        {
-            volleyball_data &pre = output_nms_[picked[j].id];
-            float iou = calc_iou(now, pre);
-            if (iou > 0.8)
-            {
-                keep = false;
-                if (now.type == pre.type && iou > 0.8)
-                {
-                    picked[j].merge_confs.push_back(now.conf);
-                    for (int k = 0; k < 5; ++k)
-                    {
-                        picked[j].merge_pts.push_back(now.pts[k]);
-                    }
-                }
-                break;
-            }
-        }
-        if (keep)
-        {
-            picked.push_back({i, {}, {}});
-        }
-    }
-
-    // 根据置信度对关键点做加权平均，矫正关键点位置
-    for (int i = 0; i < picked.size(); ++i)
-    {
-        int merge_num = picked[i].merge_confs.size();
-        volleyball_data now = output_nms_[picked[i].id];
-        double conf_sum = now.conf;
-        for (int j = 0; j < 5; ++j)
-        {
-            now.pts[j] *= now.conf;
-        }
-        for (int j = 0; j < merge_num; ++j)
-        {
-            for (int k = 0; k < 5; ++k)
-            {
-                now.pts[k] += picked[i].merge_pts[j * 5 + k] * picked[i].merge_confs[j];
-            }
-            conf_sum += picked[i].merge_confs[j];
-        }
-        for (int j = 0; j < 5; ++j)
-        {
-            now.pts[j] /= conf_sum;
-        }
-        output_data.emplace_back(now);
-    }
+    return box;
 }
 
 // 推送图像到队列中
@@ -374,12 +191,6 @@ void toe::ov_detect_base::push_img(const cv::Mat &img)
 
 bool toe::ov_detect_base::show_results(cv::Mat &img)
 {
-    cv::resize(img, img, cv::Size(640, 640));
-    cv::Point ct0, ct1, ct2, ct3;
-    for (auto i = 0; i < output_data.size(); i++)
-    {
-        cv::rectangle(img, output_data.at(i).rect, cv::Scalar(0, 255, 0), 2);
-    }
     return true;
 }
 
@@ -393,7 +204,9 @@ std::vector<volleyball_data> toe::ov_detect_base::get_results()
     return temp_return;
 }
 
-bool toe::ov_detect_base::detect()
+
+
+bool toe::ov_detect::detect(std::vector<cv::Rect2f> &rois, cv::Mat &debugImg)
 {
     if (!input_imgs.empty())
     {
@@ -403,12 +216,140 @@ bool toe::ov_detect_base::detect()
         input_imgs.clear();
         img_mutex_.unlock();
 
+        StartInference(input_img , rois , debugImg);
         // std::cout << "trans" << std::endl;
-        preprocess();
+        //preprocess();
         // std::cout << "infer" << std::endl;
-        inference();
+        //inference();
         // std::cout << "post" << std::endl;
-        postprocess();
+        //postprocess();
     }
     return true;
 }
+
+/// @brief 用于将图片填充为640x640
+/// @param source 输入图像
+/// @return 返回变化后的输出图像
+cv::Mat toe::ov_detect::letterbox(const cv::Mat &source)
+{
+    int col = source.cols;
+    int row = source.rows;
+    int _max = MAX(col, row);
+    cv::Mat result = cv::Mat::zeros(_max, _max, CV_8UC3);
+    source.copyTo(result(cv::Rect2f(0, 0, col, row)));
+    return result;
+}
+
+/// @brief 取得关注区域
+/// @param img 输入图像
+/// @param result 返回关注区域的坐标
+/// @return 返回关注区域的坐标
+cv::Rect2f toe::ov_detect::getROI(cv::Mat img, bbox result)
+{
+
+    float x1 = result.x1;
+    float y1 = result.y1;
+    float x2 = result.x2;
+    float y2 = result.y2;
+    float width = x2 - x1;
+    float height = y2 - y1;
+
+    return cv::Rect2f(x1, y1, width, height);
+}
+
+
+
+/// @brief 运行推理
+/// @param img 输入要推理的图像
+/// @param rois roi的坐标容器
+/// @param debugImg 可视化的输出图像
+void toe::ov_detect::StartInference(const cv::Mat img, std::vector<cv::Rect2f> &rois, cv::Mat &debugImg)
+{
+    cv::Mat letterbox_img = letterbox(img);
+    float scale = letterbox_img.size[0] / 640;
+    cv::Mat blob = cv::dnn::blobFromImage(letterbox_img, 1.0 / 255.0, cv::Size(640, 640), cv::Scalar(), true);
+    // -------- Step 5. Feed the blob into the input node of the Model -------
+    // Get input port for model with one input
+    auto input_port = compiled_model.input();
+    //std::cout << "DEBUGG" << std::endl;
+    // Create tensor from external memory
+    ov::Tensor input_tensor(input_port.get_element_type(), input_port.get_shape(), blob.ptr(0));
+    // Set input tensor for model with one input
+    infer_request.set_input_tensor(input_tensor);
+
+    // -------- Step 6. Start inference --------
+    infer_request.infer();
+
+    //// -------- Step 7. Get the inference result --------
+    //output_tensor = infer_request.get_output_tensor(0);
+    //output_shape = output_tensor.get_shape();
+    //auto rows = output_shape[2];       // 8400
+    //auto dimensions = output_shape[1]; // 84: box[cx, cy, w, h]+80 classes scores
+//
+    //// -------- Step 8. Postprocess the result --------
+    //auto *data = output_tensor.data<float>();
+    //cv::Mat output_buffer(dimensions, rows, CV_32F, data);
+    //cv::transpose(output_buffer, output_buffer); //[8400,84]
+//
+    //std::vector<int> class_ids;
+    //std::vector<float> class_scores;
+    //std::vector<cv::Rect> boxes;
+    //std::vector<cv::Rect2f> boxes2f;
+    //// Figure out the bbox, class_id and class_score
+    //int outputBufferRows = output_buffer.rows;
+    //for (int i = 0; i < outputBufferRows; i++)
+    //{
+    //    cv::Mat classes_scores = output_buffer.row(i).colRange(4, dimensions);
+    //    cv::Point class_id;
+    //    double maxClassScore;
+    //    cv::minMaxLoc(classes_scores, 0, &maxClassScore, 0, &class_id);
+//
+    //    if (maxClassScore > param_.bbox_conf_thresh)
+    //    {
+    //        class_scores.push_back(maxClassScore);
+    //        class_ids.push_back(class_id.x);
+    //        float cx = output_buffer.at<float>(i, 0);
+    //        float cy = output_buffer.at<float>(i, 1);
+    //        float w = output_buffer.at<float>(i, 2);
+    //        float h = output_buffer.at<float>(i, 3);
+    //        float left = float((cx - 0.5 * w) * scale);
+    //        float top = float((cy - 0.5 * h) * scale);
+    //        float width = float(w * scale);
+    //        float height = float(h * scale);
+    //        boxes.push_back(cv::Rect(left, top, width, height));
+    //        boxes2f.push_back(cv::Rect2f(left, top, width, height));
+    //    }
+    //}
+    //// NMS
+    //std::vector<int> indices;
+    //cv::dnn::NMSBoxes(boxes, class_scores, param_.bbox_conf_thresh, param_.nms_thresh, indices);
+//
+    //cv::Mat draw_img = img.clone();
+    //bbox result;
+    //for (size_t i = 0; i < indices.size(); i++)
+    //{
+    //    int index = indices[i];
+    //    result.x1 = boxes2f[index].tl().x;
+    //    result.y1 = boxes2f[index].tl().y; // top left
+    //    result.x2 = boxes2f[index].br().x;
+    //    result.y2 = boxes2f[index].br().y; // bottom right
+    //    result.class_id = class_ids[index];
+    //    result.score = class_scores[index];
+    //    //  visualizeResult(draw_img, result);
+    //    cv::Rect2f item;
+    //    item = getROI(img, result);
+//
+    //    //std::cout<<"color id: "<<result.class_id<< std::endl;
+    //    rois.emplace_back(item);
+    //}
+    //// 画出roi
+    //for (auto roi : rois)
+    //{
+    //    rectangle(debugImg, roi, cv::Scalar(255, 255, 0), 2);
+    //}
+    ////if (DEBUG == 1)
+    ////{
+    ////    imshow("result", debugImg);
+    ////    cv::waitKey(0);
+    ////}
+}//

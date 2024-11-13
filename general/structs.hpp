@@ -50,6 +50,8 @@ struct detect_data
     int sizes;
     int kpts;
     
+    bool debug; 
+
     // anchors
     std::vector<float> a1;
     std::vector<float> a2;
@@ -70,9 +72,10 @@ struct volleyball_data
     float ball_vz;
 
     float conf;
-    int type;
+    
+    float type;
     cv::Rect rect;
-    cv::Point2f pts[5];
+    cv::Point2f pts;
 };
 
 

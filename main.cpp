@@ -43,7 +43,7 @@ TOE创新实验室
 #include "usbcamera.hpp"
 #include "openvino/openvino.hpp"
 
-#define DEBUG 1 // 调试开关
+ #define DEBUG 0// 调试开关
 
 // 原子变量，用于通知线程终止
 
@@ -58,8 +58,8 @@ toe::usb_camera usb_cam; // 创建usb相机的对象
 toe::serial serial; // 创建串口的对象
 
 toe::ov_detect ov_detector; // 创建yolo的对象
- // 创建父类////
-//toe::ov_detect_base ov_detector_base;
+                            // 创建父类////
+// toe::ov_detect_base ov_detector_base;
 
 nlohmann::json config;
 
@@ -70,7 +70,6 @@ std::mutex serial_nutex;
 // 这里串口信息的结构体或者变量自行定义
 
 extern volleyball_ball_posion ball_posion;
-
 
 // 监控命令行ctrl+c,用于手动退出
 void sigint_handler(int sig)
@@ -85,16 +84,15 @@ void sigint_handler(int sig)
 void serial_process()
 {
     std::vector<double> msg;
-    //serial.init_port(config);
+    // serial.init_port(config);
 
     while (state.load())
     {
-        //msg.push_back(ball_posion.x); // 这里可以根据实际情况修改串口信息
-        //msg.push_back(ball_posion.y);
-        //msg.push_back(ball_posion.Deep);
-//
-        //serial.send_msg(msg);
-        
+        // msg.push_back(ball_posion.x); // 这里可以根据实际情况修改串口信息
+        // msg.push_back(ball_posion.y);
+        // msg.push_back(ball_posion.Deep);
+        //
+        // serial.send_msg(msg);
     }
 }
 // 处理线程
@@ -104,15 +102,18 @@ void detect_process(void)
     cv::Mat USB_frame;
     cv::Mat USB_detected_frame;
 
+    cv::Mat drawing = cv::Mat();
     int k;
     int color = 0;
-    ov_detector.detect_init(config , color);
+    ov_detector.detect_init(config, color);
 
     int frame_count = 0;
     std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间
 
     while (state.load())
     {
+        std::vector<cv::Rect2f> bjects;
+
         // 括号不能删，这是锁的生命周期
         {
             // 获取图像
@@ -125,6 +126,12 @@ void detect_process(void)
             USB_frame = usb_frame_array[0];
         }
 
+            if (DEBUG)
+            {   // 拷贝一次drawing
+
+            USB_frame.copyTo(drawing);
+
+            }
         if (MVS_frame.size[0] > 0)
         {
             // 这里可以编写图像处理与串口信息生成
@@ -141,11 +148,11 @@ void detect_process(void)
 
             std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
             std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
-            
-            //处理图像
-            //usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
-            ov_detector.detect();
-            
+
+            // 处理图像
+            // usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
+            ov_detector.detect(bjects , drawing);
+
             if (elapsed_seconds.count() >= 1)
             {
                 usb_cam.FPS = frame_count / elapsed_seconds.count();
@@ -157,11 +164,17 @@ void detect_process(void)
 
             frame_count++;
 
-            if (DEBUG)//调试内容
+            if (DEBUG) // 调试内容
             {
-                //cv::imshow("USB相机", USB_frame);
-                
-                //cv::imshow("USB相机处理后", USB_detected_frame);
+
+                for ( auto &object : ov_detector.objects)
+                {
+                    cv::rectangle(drawing, object, cv::Scalar(0, 255, 0), 2);
+                }
+
+                cv::imshow("USB相机", drawing);
+
+                // cv::imshow("USB相机处理后", USB_detected_frame);
                 cv::waitKey(1);
             }
         }
@@ -186,7 +199,7 @@ void grab_img(void)
     // 调用usb相机画面的实现函数
     cv::VideoCapture usb_camera_cap(0, cv::CAP_V4L2);
     cv::VideoWriter writer;
-    usb_cam.usb_camera_init(usb_cam, usb_camera_cap, writer , config);
+    usb_cam.usb_camera_init(usb_cam, usb_camera_cap, writer, config);
 
     int frame_count = 0;
     std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间
@@ -198,10 +211,10 @@ void grab_img(void)
         ov_detector.push_img(usb_cam_frame);
         std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
-        //ov_detector.get_results();
+        // ov_detector.get_results();
 
-        ov_detector.show_results(usb_cam_frame);
-        //处理图像  
+        //ov_detector.show_results(usb_cam_frame);
+        // 处理图像
         if (elapsed_seconds.count() >= 1)
         {
             usb_cam.FPS = frame_count / elapsed_seconds.count();
@@ -210,8 +223,8 @@ void grab_img(void)
             prev_time = current_time;
             frame_count = 0; // 重置帧数
         }
-        cv::imshow("USB相机", usb_cam_frame);
-        cv::waitKey(1);
+        //cv::imshow("USB相机", usb_cam_frame);
+        //cv::waitKey(1);
         frame_count++;
     }
 
