@@ -43,7 +43,7 @@ TOE创新实验室
 #include "usbcamera.hpp"
 #include "openvino/openvino.hpp"
 
- #define DEBUG 0// 调试开关
+ #define DEBUG 1// 调试开关
 
 // 原子变量，用于通知线程终止
 

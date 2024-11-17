@@ -75,7 +75,7 @@ bool toe::ov_detect::detect_init(const nlohmann::json &input_json, int color)
     // 加载模型
     // std::cout <<param_.xml_file_path<<std::endl;
     std::shared_ptr<ov::Model> model = core.read_model(std::string(PROJECT_PATH) + param_.xml_file_path, std::string(PROJECT_PATH) + param_.bin_file_path);
-    ov_detect::compiled_model = core.compile_model(model, "CPU",ov::hint::performance_mode(ov::hint::PerformanceMode::THROUGHPUT));
+    ov_detect::compiled_model = core.compile_model(model, "CPU" );//,ov::hint::performance_mode(ov::hint::PerformanceMode::THROUGHPUT));
     // 创建推理请求
 
     infer_request = compiled_model.create_infer_request();
@@ -280,76 +280,76 @@ void toe::ov_detect::StartInference(const cv::Mat img, std::vector<cv::Rect2f> &
     // -------- Step 6. Start inference --------
     infer_request.infer();
 
-    //// -------- Step 7. Get the inference result --------
-    //output_tensor = infer_request.get_output_tensor(0);
-    //output_shape = output_tensor.get_shape();
-    //auto rows = output_shape[2];       // 8400
-    //auto dimensions = output_shape[1]; // 84: box[cx, cy, w, h]+80 classes scores
-//
-    //// -------- Step 8. Postprocess the result --------
-    //auto *data = output_tensor.data<float>();
-    //cv::Mat output_buffer(dimensions, rows, CV_32F, data);
-    //cv::transpose(output_buffer, output_buffer); //[8400,84]
-//
-    //std::vector<int> class_ids;
-    //std::vector<float> class_scores;
-    //std::vector<cv::Rect> boxes;
-    //std::vector<cv::Rect2f> boxes2f;
-    //// Figure out the bbox, class_id and class_score
-    //int outputBufferRows = output_buffer.rows;
-    //for (int i = 0; i < outputBufferRows; i++)
+    // -------- Step 7. Get the inference result --------
+    output_tensor = infer_request.get_output_tensor(0);
+    output_shape = output_tensor.get_shape();
+    auto rows = output_shape[2];       // 8400
+    auto dimensions = output_shape[1]; // 84: box[cx, cy, w, h]+80 classes scores
+
+    // -------- Step 8. Postprocess the result --------
+    auto *data = output_tensor.data<float>();
+    cv::Mat output_buffer(dimensions, rows, CV_32F, data);
+    cv::transpose(output_buffer, output_buffer); //[8400,84]
+
+    std::vector<int> class_ids;
+    std::vector<float> class_scores;
+    std::vector<cv::Rect> boxes;
+    std::vector<cv::Rect2f> boxes2f;
+    // Figure out the bbox, class_id and class_score
+    int outputBufferRows = output_buffer.rows;
+    for (int i = 0; i < outputBufferRows; i++)
+    {
+        cv::Mat classes_scores = output_buffer.row(i).colRange(4, dimensions);
+        cv::Point class_id;
+        double maxClassScore;
+        cv::minMaxLoc(classes_scores, 0, &maxClassScore, 0, &class_id);
+
+        if (maxClassScore > param_.bbox_conf_thresh)
+        {
+            class_scores.push_back(maxClassScore);
+            class_ids.push_back(class_id.x);
+            float cx = output_buffer.at<float>(i, 0);
+            float cy = output_buffer.at<float>(i, 1);
+            float w = output_buffer.at<float>(i, 2);
+            float h = output_buffer.at<float>(i, 3);
+            float left = float((cx - 0.5 * w) * scale);
+            float top = float((cy - 0.5 * h) * scale);
+            float width = float(w * scale);
+            float height = float(h * scale);
+            boxes.push_back(cv::Rect(left, top, width, height));
+            boxes2f.push_back(cv::Rect2f(left, top, width, height));
+        }
+    }
+    // NMS
+    std::vector<int> indices;
+    cv::dnn::NMSBoxes(boxes, class_scores, param_.bbox_conf_thresh, param_.nms_thresh, indices);
+
+    cv::Mat draw_img = img.clone();
+    bbox result;
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        int index = indices[i];
+        result.x1 = boxes2f[index].tl().x;
+        result.y1 = boxes2f[index].tl().y; // top left
+        result.x2 = boxes2f[index].br().x;
+        result.y2 = boxes2f[index].br().y; // bottom right
+        result.class_id = class_ids[index];
+        result.score = class_scores[index];
+        //  visualizeResult(draw_img, result);
+        cv::Rect2f item;
+        item = getROI(img, result);
+
+        //std::cout<<"color id: "<<result.class_id<< std::endl;
+        rois.emplace_back(item);
+    }
+    // 画出roi
+    for (auto roi : rois)
+    {
+        rectangle(debugImg, roi, cv::Scalar(255, 255, 0), 2);
+    }
+    //if (DEBUG == 1)
     //{
-    //    cv::Mat classes_scores = output_buffer.row(i).colRange(4, dimensions);
-    //    cv::Point class_id;
-    //    double maxClassScore;
-    //    cv::minMaxLoc(classes_scores, 0, &maxClassScore, 0, &class_id);
-//
-    //    if (maxClassScore > param_.bbox_conf_thresh)
-    //    {
-    //        class_scores.push_back(maxClassScore);
-    //        class_ids.push_back(class_id.x);
-    //        float cx = output_buffer.at<float>(i, 0);
-    //        float cy = output_buffer.at<float>(i, 1);
-    //        float w = output_buffer.at<float>(i, 2);
-    //        float h = output_buffer.at<float>(i, 3);
-    //        float left = float((cx - 0.5 * w) * scale);
-    //        float top = float((cy - 0.5 * h) * scale);
-    //        float width = float(w * scale);
-    //        float height = float(h * scale);
-    //        boxes.push_back(cv::Rect(left, top, width, height));
-    //        boxes2f.push_back(cv::Rect2f(left, top, width, height));
-    //    }
+    //    imshow("result", debugImg);
+    //    cv::waitKey(0);
     //}
-    //// NMS
-    //std::vector<int> indices;
-    //cv::dnn::NMSBoxes(boxes, class_scores, param_.bbox_conf_thresh, param_.nms_thresh, indices);
-//
-    //cv::Mat draw_img = img.clone();
-    //bbox result;
-    //for (size_t i = 0; i < indices.size(); i++)
-    //{
-    //    int index = indices[i];
-    //    result.x1 = boxes2f[index].tl().x;
-    //    result.y1 = boxes2f[index].tl().y; // top left
-    //    result.x2 = boxes2f[index].br().x;
-    //    result.y2 = boxes2f[index].br().y; // bottom right
-    //    result.class_id = class_ids[index];
-    //    result.score = class_scores[index];
-    //    //  visualizeResult(draw_img, result);
-    //    cv::Rect2f item;
-    //    item = getROI(img, result);
-//
-    //    //std::cout<<"color id: "<<result.class_id<< std::endl;
-    //    rois.emplace_back(item);
-    //}
-    //// 画出roi
-    //for (auto roi : rois)
-    //{
-    //    rectangle(debugImg, roi, cv::Scalar(255, 255, 0), 2);
-    //}
-    ////if (DEBUG == 1)
-    ////{
-    ////    imshow("result", debugImg);
-    ////    cv::waitKey(0);
-    ////}
-}//
+}
