@@ -9,14 +9,8 @@
 
 #define PROJECT_PATH "/home/toe-volleyball/toe_aimbot/"
 
-struct Detection
+struct bbox
 {
-    short class_id;
-    float confidence;
-    cv::Rect2f box;
-};
-
-struct bbox {
     float x1;
     float y1;
     float x2;
@@ -47,12 +41,12 @@ namespace toe
         /// @brief 可视化推理结果，调试使用
         /// @param img 输出目标图像
         /// @return
-        bool show_results(cv::Mat &img);
+        bool show_results(cv::Mat &img, const std::vector<Detection> &detections);
 
-        /// @brief 推理全套流程执行函数
-        /// @return
+            /// @brief 推理全套流程执行函数
+            /// @return
 
-        std::vector<volleyball_data> get_results();
+            std::vector<volleyball_data> get_results();
 
     protected:
         // 输入的图像缓存
@@ -97,17 +91,16 @@ namespace toe
         void inference(void);
         void postprocess(void);
 
-        bool detect(std::vector<cv::Rect2f> &rois, cv::Mat &debugImg);
+        bool detect(void);
+        //void StartInference(const cv::Mat img, std::vector<cv::Rect2f> &rois, cv::Mat &debugImg);
 
-
-        void StartInference(const cv::Mat img, std::vector<cv::Rect2f> &rois, cv::Mat &debugImg);
-        
         cv::Mat letterbox(const cv::Mat &source);
         cv::Rect2f getROI(cv::Mat img, bbox result);
         cv::Rect2f GetBoundingBox(const cv::Rect2f &src) const;
         // std::vector<volleyball_data> get_results();
 
         std::vector<cv::Rect2f> objects;
+        std::vector<Detection> result;     // nmms后的结果
 
     private:
         // 创建OpenVINO核、编译模型、创建推理请求
@@ -115,19 +108,23 @@ namespace toe
         ov::CompiledModel compiled_model;
         ov::InferRequest infer_request;
 
+        // letterBOX的变换数据
+        std::vector<float> padding_info;
+
         // 创建排球对象的输出数据结构
         std::vector<volleyball_data> output_nms_;
         // std::vector<volleyball_data> output_data;
-        std::vector<float> stride_;
-        std::vector<std::vector<float>> anchors;
-
+        std::vector<Detection> Detections; // 输出的结果
         // 准备输入网络的图像数据
         std::vector<float> blob;
 
         // 输入图像的尺寸数据
         cv::Point2f scale_factor_;
         cv::Size2f model_input_shape_;
-        cv::Size model_output_shape_;
+        cv::Size   model_output_shape_;
+        float scale;
+        float scale_W;
+        float scale_H;
 
         ov::Tensor input_tensor;
         ov::Tensor output_tensor;
@@ -139,8 +136,7 @@ namespace toe
 
         cv::Mat input_image_temp;
 
-        protected:
-
+    protected:
     };
 
 }
@@ -183,5 +179,7 @@ namespace toe
     }
 
 }
+
+std::vector<Detection> nms(const std::vector<Detection> &Detections, float iou_threshold);
 
 #endif

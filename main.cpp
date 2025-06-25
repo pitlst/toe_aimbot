@@ -43,7 +43,7 @@ TOE创新实验室
 #include "usbcamera.hpp"
 #include "openvino/openvino.hpp"
 
- #define DEBUG 1// 调试开关
+#define DEBUG 1 // 调试开关
 
 // 原子变量，用于通知线程终止
 
@@ -84,15 +84,15 @@ void sigint_handler(int sig)
 void serial_process()
 {
     std::vector<double> msg;
-    // serial.init_port(config);
+    serial.init_port(config);
 
     while (state.load())
     {
-        // msg.push_back(ball_posion.x); // 这里可以根据实际情况修改串口信息
-        // msg.push_back(ball_posion.y);
-        // msg.push_back(ball_posion.Deep);
-        //
-        // serial.send_msg(msg);
+        msg.push_back(ball_posion.x); // 这里可以根据实际情况修改串口信息
+        msg.push_back(ball_posion.y);
+        msg.push_back(ball_posion.Deep);
+        
+        serial.send_msg(msg);
     }
 }
 // 处理线程
@@ -112,78 +112,9 @@ void detect_process(void)
 
     while (state.load())
     {
-        std::vector<cv::Rect2f> bjects;
 
-        // 括号不能删，这是锁的生命周期
-        {
-            // 获取图像
-            std::lock_guard<std::mutex> MVS_lock(mutex_array[0]);
-
-            MVS_frame = frame_array[0];
-
-            std::lock_guard<std::mutex> USB_lock(usb_mutex_array[0]);
-
-            USB_frame = usb_frame_array[0];
-        }
-
-            if (DEBUG)
-            {   // 拷贝一次drawing
-
-            USB_frame.copyTo(drawing);
-
-            }
-        if (MVS_frame.size[0] > 0)
-        {
-            // 这里可以编写图像处理与串口信息生成
-            // 显示图像，正式运行上赛场时需要注释和下面的waitKey，这玩意严重影响性能
-            if (DEBUG)
-            {
-                cv::imshow("1", MVS_frame);
-                k = cv::waitKey(1);
-            }
-        }
-
-        if (USB_frame.data)
-        {
-
-            std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
-            std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
-
-            // 处理图像
-            // usb_cam.usb_camera_detect(USB_frame, USB_detected_frame , config);
-            ov_detector.detect(bjects , drawing);
-
-            if (elapsed_seconds.count() >= 1)
-            {
-                usb_cam.FPS = frame_count / elapsed_seconds.count();
-                std::cout << "USB相机处理后FPS:" << usb_cam.FPS << std::endl;
-
-                prev_time = current_time;
-                frame_count = 0; // 重置帧数
-            }
-
-            frame_count++;
-
-            if (DEBUG) // 调试内容
-            {
-
-                for ( auto &object : ov_detector.objects)
-                {
-                    cv::rectangle(drawing, object, cv::Scalar(0, 255, 0), 2);
-                }
-
-                cv::imshow("USB相机", drawing);
-
-                // cv::imshow("USB相机处理后", USB_detected_frame);
-                cv::waitKey(1);
-            }
-        }
-
-        if (k == 27)
-        {
-            state.store(false);
-            break;
-        }
+        ov_detector.detect();
+ 
     }
     cv::destroyAllWindows();
 }
@@ -195,53 +126,31 @@ void detect_process(void)
 // 暂时注释掉，因为要简单使用，不用海康
 void grab_img(void)
 {
-    // 初始化
-    // 调用usb相机画面的实现函数
-    cv::VideoCapture usb_camera_cap(0, cv::CAP_V4L2);
-    cv::VideoWriter writer;
-    usb_cam.usb_camera_init(usb_cam, usb_camera_cap, writer, config);
-
-    int frame_count = 0;
-    std::chrono::steady_clock::time_point prev_time = std::chrono::steady_clock::now(); // 记录开始时间
+    hik_cam.hik_init(config, 0);
+    // 重启一次防止不正常退出后启动异常
+    hik_cam.hik_end();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    hik_cam.hik_init(config, 0);
 
     while (state.load())
     {
-
-        usb_cam.usb_camera_get_frame(usb_camera_cap, usb_cam_frame);
-        ov_detector.push_img(usb_cam_frame);
-        std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
-        std::chrono::duration<double> elapsed_seconds = current_time - prev_time;
-        // ov_detector.get_results();
-
-        //ov_detector.show_results(usb_cam_frame);
-        // 处理图像
-        if (elapsed_seconds.count() >= 1)
+        mutex_array[0].lock();
+        cv::Mat frame = frame_array[0];
+        mutex_array[0].unlock();
+        //  手动触发获取图像
+        // sleep(5);
+        if (frame.size[0] > 0)
         {
-            usb_cam.FPS = frame_count / elapsed_seconds.count();
-            std::cout << "USB相机FPS:" << usb_cam.FPS << std::endl;
-
-            prev_time = current_time;
-            frame_count = 0; // 重置帧数
+            ov_detector.push_img(frame);
+            ov_detector.show_results(frame , ov_detector.result);
+            cv::imshow("1", frame);
+            if (cv::waitKey(1) == 27)
+            {
+                return;
+            }
         }
-        //cv::imshow("USB相机", usb_cam_frame);
-        //cv::waitKey(1);
-        frame_count++;
     }
-
-    cv::destroyAllWindows(); // 销毁窗口
-
-    // int device_num = 0;
-    // hik_cam.hik_init(config, device_num);
-    //// 重启一次防止不正常退出后启动异常
-    // hik_cam.hik_end();
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
-    // hik_cam.hik_init(config, device_num);
-    // while (state.load())
-    //{
-    //     // 手动触发获取图像
-    //     sleep(5);
-    // }
-    // hik_cam.hik_end();
+    hik_cam.hik_end();
 }
 
 int main()

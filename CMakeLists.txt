@@ -37,10 +37,10 @@ include_directories(/opt/MVS/include)
 #find_package(Boost REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system filesystem)
 # 找到opencv
-set(OpenCV_DIR /home/toe-volleyball/opencv-4.8.0/build/)
+set(OpenCV_DIR /home/toe/opencv-4.11.0/build/)
 find_package(OpenCV REQUIRED)
 # 找到openvino
-set(OpenVINO_DIR /home/toe-volleyball/openvino/build/)
+set(OpenVINO_DIR /home/toe/openvino/build/)
 find_package(OpenVINO REQUIRED)
 
 # 设置头文件查找路径
@@ -50,7 +50,7 @@ include_directories(
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}
-    /home/toe-volleyball/openvino/src/inference/include/**
+    /home/toe/openvino/src/inference/include/**
     general
     camera
     serial

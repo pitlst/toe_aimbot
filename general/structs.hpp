@@ -85,4 +85,11 @@ struct pick_merge_store{
     std::vector<float> merge_confs;
 };
 
+typedef struct
+{
+    cv::Rect box;
+    float conf;
+
+}Detection;
+
 #endif
